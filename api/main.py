@@ -1,0 +1,116 @@
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+from typing import List
+
+from data.loader import load_stock_data
+from strategies.ma_crossover import ma_crossover_strategy
+from strategies.rsi import rsi_strategy
+from backtest.engine import BacktestEngine
+from models.black_scholes import black_scholes, calculate_greeks
+from models.portfolio import optimize_portfolio
+
+app = FastAPI(title="Trading Platform API", version="1.0.0")
+
+# Разрешаем запросы с фронтенда
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# --- Модели запросов ---
+
+class BacktestRequest(BaseModel):
+    ticker: str = "AAPL"
+    period: str = "2y"
+    strategy: str = "rsi"  # "rsi" или "ma"
+
+class BlackScholesRequest(BaseModel):
+    S: float = 257.0      # цена акции
+    K: float = 260.0      # страйк
+    T: float = 0.5        # время в годах
+    r: float = 0.05       # ставка
+    sigma: float = 0.25   # волатильность
+
+class PortfolioRequest(BaseModel):
+    tickers: List[str] = ["AAPL", "GOOGL", "MSFT", "TSLA", "AMZN"]
+    period: str = "2y"
+    simulations: int = 3000
+
+# --- Эндпоинты ---
+
+@app.get("/")
+def root():
+    return {"message": "Trading Platform API работает 🚀"}
+
+@app.get("/stock/{ticker}")
+def get_stock(ticker: str, period: str = "1y"):
+    """Получить данные акции"""
+    df = load_stock_data(ticker, period)
+    return {
+        "ticker": ticker,
+        "period": period,
+        "records": len(df),
+        "latest_price": round(df["Close"].iloc[-1], 2),
+        "change_1y": round((df["Close"].iloc[-1] / df["Close"].iloc[0] - 1) * 100, 2),
+    }
+
+@app.post("/backtest")
+def run_backtest(req: BacktestRequest):
+    """Запустить бэктест стратегии"""
+    df = load_stock_data(req.ticker, req.period)
+    
+    if req.strategy == "rsi":
+        df = rsi_strategy(df)
+    else:
+        df = ma_crossover_strategy(df)
+    
+    engine = BacktestEngine(initial_capital=10000)
+    results = engine.run(df)
+    
+    return {
+        "ticker": req.ticker,
+        "strategy": req.strategy,
+        "initial_capital": results["initial_capital"],
+        "final_capital": results["final_capital"],
+        "total_return": results["total_return"],
+        "sharpe_ratio": results["sharpe_ratio"],
+        "max_drawdown": results["max_drawdown"],
+        "total_trades": results["total_trades"],
+    }
+
+@app.post("/black-scholes")
+def price_option(req: BlackScholesRequest):
+    """Рассчитать цену опциона"""
+    call = black_scholes(req.S, req.K, req.T, req.r, req.sigma, "call")
+    put  = black_scholes(req.S, req.K, req.T, req.r, req.sigma, "put")
+    greeks = calculate_greeks(req.S, req.K, req.T, req.r, req.sigma)
+    
+    return {
+        "call_price": call,
+        "put_price": put,
+        "greeks": greeks
+    }
+
+@app.post("/portfolio/optimize")
+def optimize(req: PortfolioRequest):
+    """Оптимизировать портфель"""
+    data = optimize_portfolio(req.tickers, req.period, req.simulations)
+    
+    weights = {
+        ticker: round(weight * 100, 1)
+        for ticker, weight in zip(data["tickers"], data["best_weights"])
+    }
+    
+    return {
+        "weights": weights,
+        "expected_return": data["best_return"],
+        "risk": data["best_risk"],
+        "sharpe_ratio": data["best_sharpe"]
+    }
