@@ -68,7 +68,10 @@ def get_stock(ticker: str, period: str = "1y"):
 
 @app.post("/backtest")
 def run_backtest(req: BacktestRequest):
-    """Запустить бэктест стратегии"""
+    """Запустить бэктест стратегии — использует Rust движок"""
+    import rust_engine as re
+    import numpy as np
+
     df = load_stock_data(req.ticker, req.period)
     
     if req.strategy == "rsi":
@@ -78,20 +81,31 @@ def run_backtest(req: BacktestRequest):
         df = macd_strategy(df)
     else:
         df = ma_crossover_strategy(df)
-    
-    engine = BacktestEngine(initial_capital=10000)
-    results = engine.run(df)
-    
+
+    closes = df["Close"].tolist()
+    signals = df["Position"].fillna(0).astype(int).tolist()
+
+    # Rust считает бэктест
+    final_capital, total_return, max_drawdown, total_trades = re.run_backtest(
+        10000.0, closes, signals
+    )
+
+    # Sharpe считаем на Python (пока)
+    returns = df["Close"].pct_change().dropna()
+    sharpe = round(returns.mean() / returns.std() * (252 ** 0.5), 2) if returns.std() > 0 else 0
+
     return {
         "ticker": req.ticker,
         "strategy": req.strategy,
-        "initial_capital": results["initial_capital"],
-        "final_capital": results["final_capital"],
-        "total_return": results["total_return"],
-        "sharpe_ratio": results["sharpe_ratio"],
-        "max_drawdown": results["max_drawdown"],
-        "total_trades": results["total_trades"],
+        "initial_capital": 10000,
+        "final_capital": round(final_capital, 2),
+        "total_return": round(total_return, 2),
+        "sharpe_ratio": sharpe,
+        "max_drawdown": round(max_drawdown, 2),
+        "total_trades": total_trades,
+        "engine": "Rust 🦀"
     }
+
 
 @app.post("/black-scholes")
 def price_option(req: BlackScholesRequest):
