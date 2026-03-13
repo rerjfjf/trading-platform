@@ -21,6 +21,8 @@ export default function App() {
   const [mc, setMc] = useState(null);
   const [loading, setLoading] = useState(false);
   const [tab, setTab] = useState("backtest");
+  const [portfolio, setPortfolio] = useState(null);
+  const [portfolioTickers, setPortfolioTickers] = useState("AAPL,GOOGL,MSFT,TSLA,AMZN");
 
   const runBacktest = async () => {
     setLoading(true);
@@ -49,6 +51,23 @@ export default function App() {
     }
     setLoading(false);
   };
+
+  const runPortfolio = async () => {
+  setLoading(true);
+  try {
+      const tickers = portfolioTickers.split(",").map(t => t.trim().toUpperCase());
+      const res = await axios.post(`${API}/portfolio/optimize`, {
+        tickers, period: "2y", simulations: 3000
+      });
+      setPortfolio(res.data);
+    } catch (e) {
+      alert("Ошибка — убедись что сервер запущен");
+    }
+    setLoading(false);
+  };
+
+
+
 
   const color = result?.total_return >= 0 ? "#22c55e" : "#ef4444";
 
@@ -80,6 +99,10 @@ export default function App() {
         <button style={tabStyle("montecarlo")} onClick={() => setTab("montecarlo")}>
           Monte Carlo
         </button>
+
+        <button style={tabStyle("portfolio")} onClick={() => setTab("portfolio")}>
+          Портфель
+        </button>
       </div>
 
       {/* Инпуты */}
@@ -94,6 +117,33 @@ export default function App() {
             fontSize: 16, width: 200, fontFamily: "monospace"
           }}
         />
+
+        {tab === "portfolio" && (
+          <div style={{ display: "flex", gap: 12, marginBottom: 32 }}>
+            <input
+              value={portfolioTickers}
+              onChange={e => setPortfolioTickers(e.target.value.toUpperCase())}
+              placeholder="AAPL,GOOGL,MSFT,TSLA,AMZN"
+              style={{
+                background: "#1e293b", border: "1px solid #334155",
+                color: "#e2e8f0", padding: "10px 16px", borderRadius: 8,
+                fontSize: 16, width: 400, fontFamily: "monospace"
+              }}
+            />
+            <button
+              onClick={runPortfolio}
+              disabled={loading}
+              style={{
+                background: "#38bdf8", color: "#0f172a", border: "none",
+                padding: "10px 24px", borderRadius: 8, fontSize: 16,
+                fontWeight: "bold", cursor: "pointer", fontFamily: "monospace"
+              }}
+            >
+              {loading ? "Считаем..." : "Оптимизировать →"}
+            </button>
+          </div>
+        )}
+
         {tab === "backtest" && (
           <select
             value={strategy}
@@ -109,7 +159,8 @@ export default function App() {
             <option value="macd">MACD</option>
           </select>
         )}
-        <button
+       
+       {tab !== "portfolio" && <button
           onClick={tab === "backtest" ? runBacktest : runMonteCarlo}
           disabled={loading}
           style={{
@@ -119,7 +170,7 @@ export default function App() {
           }}
         >
           {loading ? "Загрузка..." : "Запустить →"}
-        </button>
+        </button>}
       </div>
 
       {/* Бэктест */}
@@ -195,6 +246,42 @@ export default function App() {
           </div>
         </div>
       )}
+
+      {tab === "portfolio" && portfolio && (
+        <div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16, marginBottom: 32 }}>
+            <Card label="Ожидаемая доходность" value={`${portfolio.expected_return}% в год`} color="#22c55e" />
+            <Card label="Риск" value={`${portfolio.risk}%`} color="#ef4444" />
+            <Card label="Sharpe Ratio" value={portfolio.sharpe_ratio} color="#38bdf8" />
+          </div>
+          <div style={{
+            background: "#1e293b", borderRadius: 12,
+            padding: "24px", border: "1px solid #334155"
+          }}>
+            <h2 style={{ color: "#38bdf8", marginBottom: 24 }}>
+              Оптимальное распределение
+            </h2>
+            {Object.entries(portfolio.weights).map(([t, weight]) => (
+              <div key={t} style={{ marginBottom: 16 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+                  <span style={{ color: "#e2e8f0", fontWeight: "bold" }}>{t}</span>
+                  <span style={{ color: "#38bdf8" }}>{weight}%</span>
+                </div>
+                <div style={{ background: "#0f172a", borderRadius: 8, height: 8 }}>
+                  <div style={{
+                    background: "linear-gradient(90deg, #38bdf8, #22c55e)",
+                    height: "100%", borderRadius: 8,
+                    width: `${weight}%`,
+                    transition: "width 0.5s ease"
+                  }} />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+
 
       {!result && !mc && !loading && (
         <div style={{ color: "#334155", fontSize: 18, textAlign: "center", marginTop: 80 }}>
