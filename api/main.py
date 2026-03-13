@@ -73,6 +73,9 @@ def run_backtest(req: BacktestRequest):
     
     if req.strategy == "rsi":
         df = rsi_strategy(df)
+    elif req.strategy == "macd":
+        from strategies.macd import macd_strategy
+        df = macd_strategy(df)
     else:
         df = ma_crossover_strategy(df)
     

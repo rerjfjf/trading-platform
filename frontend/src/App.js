@@ -106,6 +106,7 @@ export default function App() {
           >
             <option value="rsi">RSI стратегия</option>
             <option value="ma">MA Crossover</option>
+            <option value="macd">MACD</option>
           </select>
         )}
         <button
