@@ -43,6 +43,11 @@ class PortfolioRequest(BaseModel):
     period: str = "2y"
     simulations: int = 3000
 
+class MonteCarloRequest(BaseModel):
+    ticker: str = "AAPL"
+    days: int = 126
+    simulations: int = 1000
+
 # --- Эндпоинты ---
 
 @app.get("/")
@@ -113,4 +118,21 @@ def optimize(req: PortfolioRequest):
         "expected_return": data["best_return"],
         "risk": data["best_risk"],
         "sharpe_ratio": data["best_sharpe"]
+    }
+
+@app.post("/monte-carlo")
+def run_monte_carlo(req: MonteCarloRequest):
+    """Запустить Monte Carlo симуляцию"""
+    from models.monte_carlo import monte_carlo_simulation
+    data = monte_carlo_simulation(req.ticker, req.days, req.simulations)
+    return {
+        "ticker": data["ticker"],
+        "last_price": round(data["last_price"], 2),
+        "days": data["days"],
+        "percentile_5":  data["percentile_5"],
+        "percentile_25": data["percentile_25"],
+        "percentile_50": data["percentile_50"],
+        "percentile_75": data["percentile_75"],
+        "percentile_95": data["percentile_95"],
+        "prob_profit":   data["prob_profit"],
     }
