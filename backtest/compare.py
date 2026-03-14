@@ -6,31 +6,30 @@ from data.loader import load_stock_data
 from strategies.ma_crossover import ma_crossover_strategy
 from strategies.rsi import rsi_strategy
 from strategies.macd import macd_strategy
+from strategies.bollinger_bands import bollinger_bands_strategy
 from backtest.engine import BacktestEngine
 
 def compare_strategies(ticker: str = "AAPL", period: str = "2y"):
     df = load_stock_data(ticker, period)
     engine = BacktestEngine(initial_capital=10000)
 
-    df_ma   = ma_crossover_strategy(df.copy())
-    df_rsi  = rsi_strategy(df.copy())
-    df_macd = macd_strategy(df.copy())
+    results = {}
+    results["MA Cross"]  = engine.run(ma_crossover_strategy(df.copy()))
+    results["RSI"]       = engine.run(rsi_strategy(df.copy()))
+    results["MACD"]      = engine.run(macd_strategy(df.copy()))
+    results["Bollinger"] = engine.run(bollinger_bands_strategy(df.copy()))
 
-    results_ma   = engine.run(df_ma)
-    results_rsi  = engine.run(df_rsi)
-    results_macd = engine.run(df_macd)
-
-    print("\n" + "="*60)
+    print("\n" + "="*65)
     print(f"  СРАВНЕНИЕ СТРАТЕГИЙ — {ticker} ({period})")
-    print("="*60)
-    print(f"  {'Метрика':<25} {'MA Cross':>10} {'RSI':>10} {'MACD':>10}")
-    print("-"*60)
-    print(f"  {'Доходность (%)':.<25} {results_ma['total_return']:>10} {results_rsi['total_return']:>10} {results_macd['total_return']:>10}")
-    print(f"  {'Финальный капитал ($)':.<25} {results_ma['final_capital']:>10} {results_rsi['final_capital']:>10} {results_macd['final_capital']:>10}")
-    print(f"  {'Sharpe Ratio':.<25} {results_ma['sharpe_ratio']:>10} {results_rsi['sharpe_ratio']:>10} {results_macd['sharpe_ratio']:>10}")
-    print(f"  {'Макс. просадка (%)':.<25} {results_ma['max_drawdown']:>10} {results_rsi['max_drawdown']:>10} {results_macd['max_drawdown']:>10}")
-    print(f"  {'Кол-во сделок':.<25} {results_ma['total_trades']:>10} {results_rsi['total_trades']:>10} {results_macd['total_trades']:>10}")
-    print("="*60)
+    print("="*65)
+    print(f"  {'Метрика':<22} {'MA Cross':>10} {'RSI':>10} {'MACD':>10} {'Bollinger':>10}")
+    print("-"*65)
+    print(f"  {'Доходность (%)':.<22} {results['MA Cross']['total_return']:>10} {results['RSI']['total_return']:>10} {results['MACD']['total_return']:>10} {results['Bollinger']['total_return']:>10}")
+    print(f"  {'Капитал ($)':.<22} {results['MA Cross']['final_capital']:>10} {results['RSI']['final_capital']:>10} {results['MACD']['final_capital']:>10} {results['Bollinger']['final_capital']:>10}")
+    print(f"  {'Sharpe Ratio':.<22} {results['MA Cross']['sharpe_ratio']:>10} {results['RSI']['sharpe_ratio']:>10} {results['MACD']['sharpe_ratio']:>10} {results['Bollinger']['sharpe_ratio']:>10}")
+    print(f"  {'Макс. просадка (%)':.<22} {results['MA Cross']['max_drawdown']:>10} {results['RSI']['max_drawdown']:>10} {results['MACD']['max_drawdown']:>10} {results['Bollinger']['max_drawdown']:>10}")
+    print(f"  {'Сделок':.<22} {results['MA Cross']['total_trades']:>10} {results['RSI']['total_trades']:>10} {results['MACD']['total_trades']:>10} {results['Bollinger']['total_trades']:>10}")
+    print("="*65)
 
 if __name__ == "__main__":
     compare_strategies("AAPL", "2y")
