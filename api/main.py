@@ -250,3 +250,29 @@ def get_dividends(ticker: str):
         "latest_dividend": round(float(divs.iloc[-1]), 4) if not divs.empty else 0,
         "total_paid_3y": round(float(recent.sum()), 4)
     }
+
+
+
+@app.get("/news/{ticker}")
+def get_news(ticker: str):
+    """Последние новости по акции"""
+    import yfinance as yf
+    stock = yf.Ticker(ticker)
+    news = stock.news
+    
+    if not news:
+        return {"ticker": ticker, "news": []}
+    
+    return {
+        "ticker": ticker,
+        "news": [
+            {
+                "title": n.get("content", {}).get("title", ""),
+                "summary": n.get("content", {}).get("summary", ""),
+                "url": n.get("content", {}).get("canonicalUrl", {}).get("url", ""),
+                "published": n.get("content", {}).get("pubDate", ""),
+                "source": n.get("content", {}).get("provider", {}).get("displayName", "")
+            }
+            for n in news[:10]
+        ]
+    }
