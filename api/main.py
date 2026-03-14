@@ -205,3 +205,12 @@ def add_watchlist(ticker: str, notes: str = None):
 def get_watchlist_endpoint():
     """Получить вотчлист"""
     return get_watchlist()
+
+
+
+@app.delete("/watchlist/{ticker}")
+def remove_watchlist(ticker: str):
+    """Удалить акцию из вотчлиста"""
+    from database.crud import remove_from_watchlist
+    success = remove_from_watchlist(ticker)
+    return {"success": success, "ticker": ticker}

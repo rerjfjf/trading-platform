@@ -98,3 +98,16 @@ def get_watchlist():
         ]
     finally:
         db.close()
+
+def remove_from_watchlist(ticker: str):
+    """Удаляем акцию из вотчлиста"""
+    db = SessionLocal()
+    try:
+        item = db.query(WatchList).filter(WatchList.ticker == ticker).first()
+        if item:
+            db.delete(item)
+            db.commit()
+            return True
+        return False
+    finally:
+        db.close()
