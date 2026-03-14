@@ -23,6 +23,7 @@ export default function App() {
   const [tab, setTab] = useState("backtest");
   const [portfolio, setPortfolio] = useState(null);
   const [portfolioTickers, setPortfolioTickers] = useState("AAPL,GOOGL,MSFT,TSLA,AMZN");
+  const [lstm, setLstm] = useState(null);
 
   const runBacktest = async () => {
     setLoading(true);
@@ -66,6 +67,18 @@ export default function App() {
     setLoading(false);
   };
 
+  const runLstm = async () => {
+    setLoading(true);
+    try {
+      const res = await axios.post(`${API}/lstm`, {
+        ticker, period: "5y", epochs: 50, predict_days: 30
+      });
+      setLstm(res.data);
+    } catch (e) {
+      alert("Ошибка — убедись что сервер запущен");
+    }
+    setLoading(false);
+  };
 
 
 
@@ -103,20 +116,57 @@ export default function App() {
         <button style={tabStyle("portfolio")} onClick={() => setTab("portfolio")}>
           Портфель
         </button>
+
+        <button style={tabStyle("lstm")} onClick={() => setTab("lstm")}>
+          LSTM
+        </button>
       </div>
 
       {/* Инпуты */}
-      <div style={{ display: "flex", gap: 12, marginBottom: 32 }}>
-        <input
-          value={ticker}
-          onChange={e => setTicker(e.target.value.toUpperCase())}
-          placeholder="Тикер (AAPL, TSLA...)"
-          style={{
-            background: "#1e293b", border: "1px solid #334155",
-            color: "#e2e8f0", padding: "10px 16px", borderRadius: 8,
-            fontSize: 16, width: 200, fontFamily: "monospace"
-          }}
-        />
+      
+        {tab !== "portfolio" && tab !== "lstm" && (
+          <div style={{ display: "flex", gap: 12, marginBottom: 32 }}>
+            <input
+              value={ticker}
+              onChange={e => setTicker(e.target.value.toUpperCase())}
+              placeholder="Тикер (AAPL, TSLA...)"
+              style={{
+                background: "#1e293b", border: "1px solid #334155",
+                color: "#e2e8f0", padding: "10px 16px", borderRadius: 8,
+                fontSize: 16, width: 200, fontFamily: "monospace"
+              }}
+            />
+            {tab === "backtest" && (
+              <select
+                value={strategy}
+                onChange={e => setStrategy(e.target.value)}
+                style={{
+                  background: "#1e293b", border: "1px solid #334155",
+                  color: "#e2e8f0", padding: "10px 16px", borderRadius: 8,
+                  fontSize: 16, fontFamily: "monospace"
+                }}
+              >
+                <option value="rsi">RSI стратегия</option>
+                <option value="ma">MA Crossover</option>
+                <option value="macd">MACD</option>
+              </select>
+            )}
+            {tab !== "portfolio" && tab !== "lstm" && <button
+              onClick={tab === "backtest" ? runBacktest : runMonteCarlo}
+              disabled={loading}
+              style={{
+                background: "#38bdf8", color: "#0f172a", border: "none",
+                padding: "10px 24px", borderRadius: 8, fontSize: 16,
+                fontWeight: "bold", cursor: "pointer", fontFamily: "monospace"
+              }}
+            >
+              {loading ? "Загрузка..." : "Запустить →"}
+            </button>}
+          </div>
+        )}
+
+
+
 
         {tab === "portfolio" && (
           <div style={{ display: "flex", gap: 12, marginBottom: 32 }}>
@@ -160,7 +210,7 @@ export default function App() {
           </select>
         )}
        
-       {tab !== "portfolio" && <button
+       {tab !== "portfolio" && tab !== "lstm" && <button
           onClick={tab === "backtest" ? runBacktest : runMonteCarlo}
           disabled={loading}
           style={{
@@ -171,7 +221,33 @@ export default function App() {
         >
           {loading ? "Загрузка..." : "Запустить →"}
         </button>}
-      </div>
+
+        {tab === "lstm" && (
+          <div style={{ display: "flex", gap: 12, marginBottom: 32 }}>
+            <input
+              value={ticker}
+              onChange={e => setTicker(e.target.value.toUpperCase())}
+              placeholder="Тикер (AAPL, TSLA...)"
+              style={{
+                background: "#1e293b", border: "1px solid #334155",
+                color: "#e2e8f0", padding: "10px 16px", borderRadius: 8,
+                fontSize: 16, width: 200, fontFamily: "monospace"
+              }}
+            />
+            <button
+              onClick={runLstm}
+              disabled={loading}
+              style={{
+                background: "#a855f7", color: "white", border: "none",
+                padding: "10px 24px", borderRadius: 8, fontSize: 16,
+                fontWeight: "bold", cursor: "pointer", fontFamily: "monospace"
+              }}
+            >
+              {loading ? "Обучаем нейросеть..." : "Предсказать →"}
+            </button>
+          </div>
+        )}
+      
 
       {/* Бэктест */}
       {tab === "backtest" && result && stock && (
@@ -281,6 +357,49 @@ export default function App() {
         </div>
       )}
 
+
+      {tab === "lstm" && lstm && (
+        <div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16, marginBottom: 32 }}>
+            <Card label="Текущая цена" value={`$${lstm.last_price}`} />
+            <Card label="Прогноз через 30 дней" value={`$${lstm.predicted_price_30d}`} color={lstm.change_30d >= 0 ? "#22c55e" : "#ef4444"} />
+            <Card label="Ожидаемое изменение" value={`${lstm.change_30d}%`} color={lstm.change_30d >= 0 ? "#22c55e" : "#ef4444"} />
+          </div>
+          <div style={{
+            background: "#1e293b", borderRadius: 12,
+            padding: "24px", border: "1px solid #334155"
+          }}>
+            <h2 style={{ color: "#a855f7", marginBottom: 16 }}>
+              Прогноз цены на 30 дней
+            </h2>
+            <div style={{ display: "flex", alignItems: "flex-end", gap: 2, height: 120 }}>
+              {lstm.future_prices.map((price, i) => {
+                const min = Math.min(...lstm.future_prices);
+                const max = Math.max(...lstm.future_prices);
+                const height = ((price - min) / (max - min)) * 100 + 10;
+                const color = price >= lstm.last_price ? "#22c55e" : "#ef4444";
+                return (
+                  <div
+                    key={i}
+                    style={{
+                      flex: 1, height: `${height}%`,
+                      background: color, opacity: 0.7,
+                      borderRadius: "2px 2px 0 0",
+                      transition: "height 0.3s ease"
+                    }}
+                    title={`День ${i+1}: $${price}`}
+                  />
+                );
+              })}
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between", marginTop: 8, color: "#64748b", fontSize: 12 }}>
+              <span>День 1</span>
+              <span>День 15</span>
+              <span>День 30</span>
+            </div>
+          </div>
+        </div>
+      )}
 
 
       {!result && !mc && !loading && (

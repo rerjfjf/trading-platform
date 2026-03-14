@@ -153,3 +153,23 @@ def run_monte_carlo(req: MonteCarloRequest):
         "percentile_95": data["percentile_95"],
         "prob_profit":   data["prob_profit"],
     }
+
+
+class LSTMRequest(BaseModel):
+    ticker: str = "AAPL"
+    period: str = "5y"
+    epochs: int = 50
+    predict_days: int = 30
+
+@app.post("/lstm")
+def run_lstm(req: LSTMRequest):
+    """Предсказание цены через LSTM нейросеть"""
+    from models.lstm import train_and_predict
+    data = train_and_predict(req.ticker, req.period, epochs=req.epochs, predict_days=req.predict_days)
+    return {
+        "ticker": data["ticker"],
+        "last_price": round(data["last_price"], 2),
+        "predicted_price_30d": round(data["predicted_price_30d"], 2),
+        "change_30d": data["change_30d"],
+        "future_prices": [round(p, 2) for p in data["future_prices"].tolist()]
+    }
