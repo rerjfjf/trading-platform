@@ -329,3 +329,10 @@ def find_best_strategy(ticker: str, period: str = "2y"):
         "results": results,
         "recommendation": f"Для {ticker} лучше всего работает {best} — score {valid[best]['score']}" if best else "Нет данных"
     }
+
+
+@app.get("/stress-test/{ticker}")
+def run_stress_test(ticker: str, portfolio_value: float = 10000):
+    """Stress testing — поведение в исторических кризисах"""
+    from models.stress_test import stress_test
+    return stress_test(ticker, portfolio_value)
