@@ -1,15 +1,39 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { motion } from "framer-motion";
 import axios from "axios";
+import Navbar from "./components/Navbar";
+import HeroSection from "./components/HeroSection";
+import { theme } from "./styles/theme";
 
 const API = "http://127.0.0.1:8000";
 
+// Компонент карточки
 const Card = ({ label, value, color }) => (
-  <div style={{
-    background: "#1e293b", borderRadius: 12,
-    padding: "20px", border: "1px solid #334155"
-  }}>
-    <div style={{ color: "#64748b", fontSize: 12, marginBottom: 8 }}>{label}</div>
-    <div style={{ fontSize: 22, fontWeight: "bold", color: color || "#e2e8f0" }}>{value}</div>
+  <motion.div
+    whileHover={{ scale: 1.02, borderColor: theme.colors.yellow }}
+    style={{
+      background: theme.colors.bgCard,
+      borderRadius: 8,
+      padding: "20px",
+      border: `1px solid ${theme.colors.border}`,
+      transition: "all 0.2s",
+    }}
+  >
+    <div style={{ color: theme.colors.textSecondary, fontFamily: theme.fonts.mono, fontSize: 10, letterSpacing: 2, marginBottom: 8 }}>{label}</div>
+    <div style={{ fontSize: 22, fontWeight: "bold", color: color || theme.colors.text, fontFamily: theme.fonts.mono }}>{value}</div>
+  </motion.div>
+);
+
+// Секция заголовок
+const SectionHeader = ({ id, title, subtitle }) => (
+  <div id={id} style={{ marginBottom: 32, paddingTop: 80 }}>
+    <div style={{ color: theme.colors.yellow, fontFamily: theme.fonts.mono, fontSize: 11, letterSpacing: 3, marginBottom: 8 }}>
+      // {subtitle}
+    </div>
+    <div style={{ color: theme.colors.text, fontFamily: theme.fonts.mono, fontSize: 24, fontWeight: "bold", letterSpacing: 2 }}>
+      {title}
+    </div>
+    <div style={{ width: 60, height: 2, background: theme.colors.yellow, marginTop: 12, boxShadow: theme.glow.yellow }} />
   </div>
 );
 
@@ -19,394 +43,504 @@ export default function App() {
   const [result, setResult] = useState(null);
   const [stock, setStock] = useState(null);
   const [mc, setMc] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [tab, setTab] = useState("backtest");
   const [portfolio, setPortfolio] = useState(null);
   const [portfolioTickers, setPortfolioTickers] = useState("AAPL,GOOGL,MSFT,TSLA,AMZN");
   const [lstm, setLstm] = useState(null);
+  const [news, setNews] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [activeSection, setActiveSection] = useState("DASHBOARD");
+
+  // Загружаем новости при старте
+  useEffect(() => {
+    axios.get(`${API}/news/AAPL`).then(r => setNews(r.data.news)).catch(() => {});
+  }, []);
 
   const runBacktest = async () => {
     setLoading(true);
     try {
-      const [backtestRes, stockRes] = await Promise.all([
+      const [b, s] = await Promise.all([
         axios.post(`${API}/backtest`, { ticker, period: "2y", strategy }),
         axios.get(`${API}/stock/${ticker}`)
       ]);
-      setResult(backtestRes.data);
-      setStock(stockRes.data);
-    } catch (e) {
-      alert("Ошибка — убедись что сервер запущен");
-    }
+      setResult(b.data);
+      setStock(s.data);
+    } catch (e) { alert("Ошибка сервера"); }
     setLoading(false);
   };
 
   const runMonteCarlo = async () => {
     setLoading(true);
     try {
-      const res = await axios.post(`${API}/monte-carlo`, {
-        ticker, days: 126, simulations: 1000
-      });
-      setMc(res.data);
-    } catch (e) {
-      alert("Ошибка — убедись что сервер запущен");
-    }
+      const r = await axios.post(`${API}/monte-carlo`, { ticker, days: 126, simulations: 1000 });
+      setMc(r.data);
+    } catch (e) { alert("Ошибка сервера"); }
     setLoading(false);
   };
 
   const runPortfolio = async () => {
-  setLoading(true);
-  try {
+    setLoading(true);
+    try {
       const tickers = portfolioTickers.split(",").map(t => t.trim().toUpperCase());
-      const res = await axios.post(`${API}/portfolio/optimize`, {
-        tickers, period: "2y", simulations: 3000
-      });
-      setPortfolio(res.data);
-    } catch (e) {
-      alert("Ошибка — убедись что сервер запущен");
-    }
+      const r = await axios.post(`${API}/portfolio/optimize`, { tickers, period: "2y", simulations: 3000 });
+      setPortfolio(r.data);
+    } catch (e) { alert("Ошибка сервера"); }
     setLoading(false);
   };
 
   const runLstm = async () => {
     setLoading(true);
     try {
-      const res = await axios.post(`${API}/lstm`, {
-        ticker, period: "5y", epochs: 50, predict_days: 30
-      });
-      setLstm(res.data);
-    } catch (e) {
-      alert("Ошибка — убедись что сервер запущен");
-    }
+      const r = await axios.post(`${API}/lstm`, { ticker, period: "5y", epochs: 50, predict_days: 30 });
+      setLstm(r.data);
+    } catch (e) { alert("Ошибка сервера"); }
     setLoading(false);
   };
 
+  const inputStyle = {
+    background: theme.colors.bgCard,
+    border: `1px solid ${theme.colors.border}`,
+    color: theme.colors.text,
+    padding: "10px 16px",
+    borderRadius: 6,
+    fontSize: 13,
+    fontFamily: theme.fonts.mono,
+    outline: "none",
+  };
 
-
-  const color = result?.total_return >= 0 ? "#22c55e" : "#ef4444";
-
-  const tabStyle = (t) => ({
-    padding: "10px 24px", borderRadius: 8, cursor: "pointer",
-    fontFamily: "monospace", fontSize: 14, border: "none",
-    background: tab === t ? "#38bdf8" : "#1e293b",
-    color: tab === t ? "#0f172a" : "#64748b",
-    fontWeight: tab === t ? "bold" : "normal"
+  const btnStyle = (color = theme.colors.yellow) => ({
+    background: "transparent",
+    border: `1px solid ${color}`,
+    color: color,
+    padding: "10px 24px",
+    borderRadius: 6,
+    fontSize: 12,
+    fontWeight: "bold",
+    cursor: "pointer",
+    fontFamily: theme.fonts.mono,
+    letterSpacing: 2,
+    transition: "all 0.2s",
   });
 
+  const returnColor = (val) => val >= 0 ? theme.colors.green : theme.colors.red;
+
   return (
-    <div style={{
-      minHeight: "100vh", background: "#0f172a",
-      color: "#e2e8f0", fontFamily: "monospace", padding: "40px"
-    }}>
-      <h1 style={{ fontSize: 28, color: "#38bdf8", marginBottom: 8 }}>
-        Trading Platform
-      </h1>
-      <p style={{ color: "#64748b", marginBottom: 32 }}>
-        Algorithmic backtesting & portfolio analysis
-      </p>
+    <div style={{ background: theme.colors.bg, minHeight: "100vh", color: theme.colors.text }}>
+      <Navbar activeSection={activeSection} />
 
-      {/* Табы */}
-      <div style={{ display: "flex", gap: 8, marginBottom: 32 }}>
-        <button style={tabStyle("backtest")} onClick={() => setTab("backtest")}>
-          Бэктест
-        </button>
-        <button style={tabStyle("montecarlo")} onClick={() => setTab("montecarlo")}>
-          Monte Carlo
-        </button>
+      {/* Hero */}
+      <HeroSection />
 
-        <button style={tabStyle("portfolio")} onClick={() => setTab("portfolio")}>
-          Портфель
-        </button>
+      {/* Основной контент */}
+      <div style={{ maxWidth: 1400, margin: "0 auto", padding: "0 32px 80px" }}>
 
-        <button style={tabStyle("lstm")} onClick={() => setTab("lstm")}>
-          LSTM
-        </button>
-      </div>
+        {/* DASHBOARD */}
+        <SectionHeader id="dashboard" title="BACKTESTING DASHBOARD" subtitle="STRATEGY ANALYSIS" />
 
-      {/* Инпуты */}
-      
-        {tab !== "portfolio" && tab !== "lstm" && (
-          <div style={{ display: "flex", gap: 12, marginBottom: 32 }}>
-            <input
-              value={ticker}
-              onChange={e => setTicker(e.target.value.toUpperCase())}
-              placeholder="Тикер (AAPL, TSLA...)"
-              style={{
-                background: "#1e293b", border: "1px solid #334155",
-                color: "#e2e8f0", padding: "10px 16px", borderRadius: 8,
-                fontSize: 16, width: 200, fontFamily: "monospace"
-              }}
-            />
-            {tab === "backtest" && (
-              <select
-                value={strategy}
-                onChange={e => setStrategy(e.target.value)}
-                style={{
-                  background: "#1e293b", border: "1px solid #334155",
-                  color: "#e2e8f0", padding: "10px 16px", borderRadius: 8,
-                  fontSize: 16, fontFamily: "monospace"
-                }}
-              >
-                <option value="rsi">RSI стратегия</option>
-                <option value="ma">MA Crossover</option>
-                <option value="macd">MACD</option>
-              </select>
-            )}
-            {tab !== "portfolio" && tab !== "lstm" && <button
-              onClick={tab === "backtest" ? runBacktest : runMonteCarlo}
-              disabled={loading}
-              style={{
-                background: "#38bdf8", color: "#0f172a", border: "none",
-                padding: "10px 24px", borderRadius: 8, fontSize: 16,
-                fontWeight: "bold", cursor: "pointer", fontFamily: "monospace"
-              }}
-            >
-              {loading ? "Загрузка..." : "Запустить →"}
-            </button>}
-          </div>
-        )}
-
-
-
-
-        {tab === "portfolio" && (
-          <div style={{ display: "flex", gap: 12, marginBottom: 32 }}>
-            <input
-              value={portfolioTickers}
-              onChange={e => setPortfolioTickers(e.target.value.toUpperCase())}
-              placeholder="AAPL,GOOGL,MSFT,TSLA,AMZN"
-              style={{
-                background: "#1e293b", border: "1px solid #334155",
-                color: "#e2e8f0", padding: "10px 16px", borderRadius: 8,
-                fontSize: 16, width: 400, fontFamily: "monospace"
-              }}
-            />
-            <button
-              onClick={runPortfolio}
-              disabled={loading}
-              style={{
-                background: "#38bdf8", color: "#0f172a", border: "none",
-                padding: "10px 24px", borderRadius: 8, fontSize: 16,
-                fontWeight: "bold", cursor: "pointer", fontFamily: "monospace"
-              }}
-            >
-              {loading ? "Считаем..." : "Оптимизировать →"}
-            </button>
-          </div>
-        )}
-
-        {tab === "backtest" && (
-          <select
-            value={strategy}
-            onChange={e => setStrategy(e.target.value)}
-            style={{
-              background: "#1e293b", border: "1px solid #334155",
-              color: "#e2e8f0", padding: "10px 16px", borderRadius: 8,
-              fontSize: 16, fontFamily: "monospace"
-            }}
-          >
-            <option value="rsi">RSI стратегия</option>
-            <option value="ma">MA Crossover</option>
-            <option value="macd">MACD</option>
-          </select>
-        )}
-       
-       {tab !== "portfolio" && tab !== "lstm" && <button
-          onClick={tab === "backtest" ? runBacktest : runMonteCarlo}
-          disabled={loading}
+        {/* Контролы */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
           style={{
-            background: "#38bdf8", color: "#0f172a", border: "none",
-            padding: "10px 24px", borderRadius: 8, fontSize: 16,
-            fontWeight: "bold", cursor: "pointer", fontFamily: "monospace"
+            display: "flex", gap: 12, marginBottom: 32,
+            background: theme.colors.bgCard,
+            border: `1px solid ${theme.colors.border}`,
+            borderRadius: 8, padding: 20,
+            flexWrap: "wrap",
           }}
         >
-          {loading ? "Загрузка..." : "Запустить →"}
-        </button>}
-
-        {tab === "lstm" && (
-          <div style={{ display: "flex", gap: 12, marginBottom: 32 }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+            <label style={{ color: theme.colors.textSecondary, fontFamily: theme.fonts.mono, fontSize: 10, letterSpacing: 2 }}>TICKER</label>
             <input
               value={ticker}
               onChange={e => setTicker(e.target.value.toUpperCase())}
-              placeholder="Тикер (AAPL, TSLA...)"
-              style={{
-                background: "#1e293b", border: "1px solid #334155",
-                color: "#e2e8f0", padding: "10px 16px", borderRadius: 8,
-                fontSize: 16, width: 200, fontFamily: "monospace"
-              }}
+              style={{ ...inputStyle, width: 120 }}
+              placeholder="AAPL"
             />
-            <button
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+            <label style={{ color: theme.colors.textSecondary, fontFamily: theme.fonts.mono, fontSize: 10, letterSpacing: 2 }}>STRATEGY</label>
+            <select value={strategy} onChange={e => setStrategy(e.target.value)} style={{ ...inputStyle, width: 180 }}>
+              <option value="rsi">RSI Strategy</option>
+              <option value="ma">MA Crossover</option>
+              <option value="macd">MACD</option>
+              <option value="bollinger">Bollinger Bands</option>
+            </select>
+          </div>
+          <div style={{ display: "flex", alignItems: "flex-end" }}>
+            <motion.button
+              whileHover={{ background: theme.colors.yellowGlow, boxShadow: theme.glow.yellow }}
+              whileTap={{ scale: 0.95 }}
+              onClick={runBacktest}
+              disabled={loading}
+              style={btnStyle()}
+            >
+              {loading ? "LOADING..." : "▶ RUN BACKTEST"}
+            </motion.button>
+          </div>
+          <div style={{ display: "flex", alignItems: "flex-end" }}>
+            <motion.button
+              whileHover={{ background: "rgba(0,255,136,0.1)", boxShadow: theme.glow.green }}
+              whileTap={{ scale: 0.95 }}
+              onClick={runMonteCarlo}
+              disabled={loading}
+              style={btnStyle(theme.colors.green)}
+            >
+              ◈ MONTE CARLO
+            </motion.button>
+          </div>
+          <div style={{ display: "flex", alignItems: "flex-end" }}>
+            <motion.button
+              whileHover={{ background: "rgba(0,255,136,0.1)", boxShadow: theme.glow.green }}
+              whileTap={{ scale: 0.95 }}
               onClick={runLstm}
               disabled={loading}
+              style={btnStyle(theme.colors.green)}
+            >
+              ◈ LSTM AI
+            </motion.button>
+          </div>
+        </motion.div>
+
+        {/* Результаты бэктеста */}
+        {result && stock && (
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 24 }}>
+              <Card label="TICKER" value={result.ticker} color={theme.colors.yellow} />
+              <Card label="TOTAL RETURN" value={`${result.total_return}%`} color={returnColor(result.total_return)} />
+              <Card label="FINAL CAPITAL" value={`$${result.final_capital.toLocaleString()}`} color={returnColor(result.total_return)} />
+              <Card label="SHARPE RATIO" value={result.sharpe_ratio} color={theme.colors.yellow} />
+              <Card label="MAX DRAWDOWN" value={`${result.max_drawdown}%`} color={theme.colors.red} />
+              <Card label="TOTAL TRADES" value={result.total_trades} />
+              <Card label="CURRENT PRICE" value={`$${stock.latest_price}`} color={theme.colors.yellow} />
+              <Card label="1Y RETURN" value={`${stock.change_1y}%`} color={returnColor(stock.change_1y)} />
+            </div>
+
+            {/* Инфо о стратегии */}
+            <motion.div
+              whileHover={{ borderColor: theme.colors.yellow }}
               style={{
-                background: "#a855f7", color: "white", border: "none",
-                padding: "10px 24px", borderRadius: 8, fontSize: 16,
-                fontWeight: "bold", cursor: "pointer", fontFamily: "monospace"
+                background: theme.colors.bgCard,
+                borderRadius: 8,
+                padding: 24,
+                border: `1px solid ${theme.colors.border}`,
+                marginBottom: 32,
+                transition: "all 0.2s",
               }}
             >
-              {loading ? "Обучаем нейросеть..." : "Предсказать →"}
-            </button>
-          </div>
+              <div style={{ color: theme.colors.yellow, fontFamily: theme.fonts.mono, fontSize: 11, letterSpacing: 2, marginBottom: 8 }}>
+                // STRATEGY INFO — ENGINE: RUST 🦀
+              </div>
+              <div style={{ fontFamily: theme.fonts.mono, fontSize: 13, color: theme.colors.textSecondary }}>
+                {result.strategy === "rsi" && "RSI: Buy when RSI < 30 (oversold), sell when RSI > 70 (overbought)"}
+                {result.strategy === "ma" && "MA Crossover: Buy when MA20 crosses MA50 upward, sell on reverse"}
+                {result.strategy === "macd" && "MACD: Buy when MACD crosses Signal line upward, sell on reverse"}
+                {result.strategy === "bollinger" && "Bollinger Bands: Buy at lower band touch, sell at upper band touch"}
+              </div>
+              <div style={{ marginTop: 16, padding: 12, background: theme.colors.bg, borderRadius: 6, fontFamily: theme.fonts.mono, fontSize: 12 }}>
+                <span style={{ color: theme.colors.textSecondary }}>Initial: </span>
+                <span style={{ color: theme.colors.text }}>${result.initial_capital.toLocaleString()}</span>
+                <span style={{ color: theme.colors.textSecondary, marginLeft: 24 }}>Final: </span>
+                <span style={{ color: returnColor(result.total_return) }}>${result.final_capital.toLocaleString()}</span>
+                <span style={{ color: theme.colors.textSecondary, marginLeft: 24 }}>P&L: </span>
+                <span style={{ color: returnColor(result.total_return) }}>
+                  ${(result.final_capital - result.initial_capital).toFixed(2)}
+                </span>
+              </div>
+            </motion.div>
+          </motion.div>
         )}
-      
 
-      {/* Бэктест */}
-      {tab === "backtest" && result && stock && (
-        <div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16, marginBottom: 32 }}>
-            <Card label="Тикер" value={result.ticker} />
-            <Card label="Доходность" value={`${result.total_return}%`} color={color} />
-            <Card label="Финальный капитал" value={`$${result.final_capital.toLocaleString()}`} color={color} />
-            <Card label="Sharpe Ratio" value={result.sharpe_ratio} />
-            <Card label="Макс. просадка" value={`${result.max_drawdown}%`} color="#ef4444" />
-            <Card label="Сделок" value={result.total_trades} />
-            <Card label="Цена сейчас" value={`$${stock.latest_price}`} />
-            <Card label="Рост за год" value={`${stock.change_1y}%`} color={stock.change_1y >= 0 ? "#22c55e" : "#ef4444"} />
-          </div>
-          <div style={{
-            background: "#1e293b", borderRadius: 12,
-            padding: "24px", border: "1px solid #334155"
-          }}>
-            <h2 style={{ color: "#38bdf8", marginBottom: 4 }}>
-              {result.strategy === "rsi" ? "RSI стратегия" : "MA Crossover"}
-            </h2>
-            <p style={{ color: "#64748b", fontSize: 14 }}>
-              {result.strategy === "rsi"
-                ? "Покупает когда RSI < 30, продаёт когда RSI > 70"
-                : "Покупает когда MA20 пересекает MA50 снизу вверх"
-              }
-            </p>
-            <div style={{ marginTop: 16, padding: 16, background: "#0f172a", borderRadius: 8 }}>
-              <span style={{ color: "#64748b" }}>Начальный капитал: </span>
-              <span>${result.initial_capital.toLocaleString()}</span>
-              <span style={{ color: "#64748b", marginLeft: 24 }}>Финальный: </span>
-              <span style={{ color }}>${result.final_capital.toLocaleString()}</span>
-              <span style={{ color: "#64748b", marginLeft: 24 }}>Прибыль: </span>
-              <span style={{ color }}>${(result.final_capital - result.initial_capital).toFixed(2)}</span>
+        {/* Monte Carlo результаты */}
+        {mc && (
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} style={{ marginBottom: 32 }}>
+            <div style={{ color: theme.colors.green, fontFamily: theme.fonts.mono, fontSize: 11, letterSpacing: 2, marginBottom: 16 }}>
+              // MONTE CARLO SIMULATION — {mc.ticker}
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, marginBottom: 16 }}>
+              <Card label="CURRENT PRICE" value={`$${mc.last_price}`} color={theme.colors.yellow} />
+              <Card label="MEDIAN 50%" value={`$${mc.percentile_50}`} color={theme.colors.green} />
+              <Card label="PROFIT PROBABILITY" value={`${mc.prob_profit}%`} color={mc.prob_profit >= 50 ? theme.colors.green : theme.colors.red} />
+              <Card label="WORST CASE 5%" value={`$${mc.percentile_5}`} color={theme.colors.red} />
+              <Card label="BEST CASE 95%" value={`$${mc.percentile_95}`} color={theme.colors.green} />
+              <Card label="PERIOD" value={`${mc.days} days`} color={theme.colors.yellow} />
+            </div>
+            {/* Визуализация диапазона */}
+            <motion.div
+              style={{
+                background: theme.colors.bgCard,
+                borderRadius: 8,
+                padding: 24,
+                border: `1px solid ${theme.colors.border}`,
+              }}
+            >
+              <div style={{ color: theme.colors.green, fontFamily: theme.fonts.mono, fontSize: 11, letterSpacing: 2, marginBottom: 16 }}>
+                PRICE RANGE FORECAST
+              </div>
+              <div style={{ height: 8, background: theme.colors.bg, borderRadius: 4, overflow: "hidden", position: "relative" }}>
+                <motion.div
+                  initial={{ width: 0 }}
+                  animate={{ width: "100%" }}
+                  transition={{ duration: 1 }}
+                  style={{
+                    height: "100%",
+                    background: `linear-gradient(90deg, ${theme.colors.red}, ${theme.colors.yellow}, ${theme.colors.green})`,
+                    borderRadius: 4,
+                  }}
+                />
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between", marginTop: 8, fontFamily: theme.fonts.mono, fontSize: 11 }}>
+                <span style={{ color: theme.colors.red }}>${mc.percentile_5} (5%)</span>
+                <span style={{ color: theme.colors.yellow }}>${mc.percentile_25} (25%)</span>
+                <span style={{ color: theme.colors.text }}>${mc.percentile_50} (50%)</span>
+                <span style={{ color: theme.colors.yellow }}>${mc.percentile_75} (75%)</span>
+                <span style={{ color: theme.colors.green }}>${mc.percentile_95} (95%)</span>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+
+        {/* LSTM результаты */}
+        {lstm && (
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} style={{ marginBottom: 32 }}>
+            <div style={{ color: theme.colors.green, fontFamily: theme.fonts.mono, fontSize: 11, letterSpacing: 2, marginBottom: 16 }}>
+              // LSTM NEURAL NETWORK FORECAST — {lstm.ticker}
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, marginBottom: 16 }}>
+              <Card label="CURRENT PRICE" value={`$${lstm.last_price}`} color={theme.colors.yellow} />
+              <Card label="30D FORECAST" value={`$${lstm.predicted_price_30d}`} color={returnColor(lstm.change_30d)} />
+              <Card label="EXPECTED CHANGE" value={`${lstm.change_30d}%`} color={returnColor(lstm.change_30d)} />
+            </div>
+            {/* Барчарт прогноза */}
+            <motion.div
+              style={{
+                background: theme.colors.bgCard,
+                borderRadius: 8,
+                padding: 24,
+                border: `1px solid ${theme.colors.border}`,
+              }}
+            >
+              <div style={{ color: theme.colors.green, fontFamily: theme.fonts.mono, fontSize: 11, letterSpacing: 2, marginBottom: 16 }}>
+                30-DAY PRICE FORECAST
+              </div>
+              <div style={{ display: "flex", alignItems: "flex-end", gap: 2, height: 100 }}>
+                {lstm.future_prices.map((price, i) => {
+                  const min = Math.min(...lstm.future_prices);
+                  const max = Math.max(...lstm.future_prices);
+                  const h = ((price - min) / (max - min)) * 85 + 15;
+                  const c = price >= lstm.last_price ? theme.colors.green : theme.colors.red;
+                  return (
+                    <motion.div
+                      key={i}
+                      initial={{ height: 0 }}
+                      animate={{ height: `${h}%` }}
+                      transition={{ delay: i * 0.02, duration: 0.3 }}
+                      style={{ flex: 1, background: c, opacity: 0.7, borderRadius: "2px 2px 0 0" }}
+                      title={`Day ${i + 1}: $${price}`}
+                    />
+                  );
+                })}
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between", marginTop: 8, fontFamily: theme.fonts.mono, fontSize: 10, color: theme.colors.textSecondary }}>
+                <span>Day 1</span>
+                <span>Day 15</span>
+                <span>Day 30</span>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+
+        {/* PORTFOLIO */}
+        <SectionHeader id="models" title="PORTFOLIO OPTIMIZATION" subtitle="MARKOWITZ MODEL" />
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          style={{
+            background: theme.colors.bgCard,
+            border: `1px solid ${theme.colors.border}`,
+            borderRadius: 8,
+            padding: 24,
+            marginBottom: 32,
+          }}
+        >
+          <div style={{ display: "flex", gap: 12, marginBottom: 24, flexWrap: "wrap" }}>
+            <div style={{ flex: 1 }}>
+              <label style={{ color: theme.colors.textSecondary, fontFamily: theme.fonts.mono, fontSize: 10, letterSpacing: 2, display: "block", marginBottom: 4 }}>
+                TICKERS (comma separated)
+              </label>
+              <input
+                value={portfolioTickers}
+                onChange={e => setPortfolioTickers(e.target.value.toUpperCase())}
+                style={{ ...inputStyle, width: "100%" }}
+              />
+            </div>
+            <div style={{ display: "flex", alignItems: "flex-end" }}>
+              <motion.button
+                whileHover={{ background: theme.colors.yellowGlow, boxShadow: theme.glow.yellow }}
+                whileTap={{ scale: 0.95 }}
+                onClick={runPortfolio}
+                disabled={loading}
+                style={btnStyle()}
+              >
+                ◈ OPTIMIZE
+              </motion.button>
             </div>
           </div>
-        </div>
-      )}
 
-      {/* Monte Carlo */}
-      {tab === "montecarlo" && mc && (
-        <div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16, marginBottom: 32 }}>
-            <Card label="Текущая цена" value={`$${mc.last_price}`} />
-            <Card label="Вероятность прибыли" value={`${mc.prob_profit}%`} color={mc.prob_profit >= 50 ? "#22c55e" : "#ef4444"} />
-            <Card label="Период" value={`${mc.days} дней`} />
-            <Card label="Худший сценарий 5%" value={`$${mc.percentile_5}`} color="#ef4444" />
-            <Card label="Медиана 50%" value={`$${mc.percentile_50}`} color="#38bdf8" />
-            <Card label="Лучший сценарий 95%" value={`$${mc.percentile_95}`} color="#22c55e" />
-          </div>
-          <div style={{
-            background: "#1e293b", borderRadius: 12,
-            padding: "24px", border: "1px solid #334155"
-          }}>
-            <h2 style={{ color: "#38bdf8", marginBottom: 16 }}>
-              Диапазон цен через {mc.days} дней
-            </h2>
-            <div style={{ position: "relative", height: 24, background: "#0f172a", borderRadius: 12, overflow: "hidden" }}>
-              <div style={{
-                position: "absolute", height: "100%", borderRadius: 12,
-                background: "linear-gradient(90deg, #ef4444, #38bdf8, #22c55e)",
-                width: "100%", opacity: 0.7
-              }} />
-            </div>
-            <div style={{ display: "flex", justifyContent: "space-between", marginTop: 8, color: "#64748b", fontSize: 12 }}>
-              <span style={{ color: "#ef4444" }}>${mc.percentile_5} (5%)</span>
-              <span style={{ color: "#fbbf24" }}>${mc.percentile_25} (25%)</span>
-              <span style={{ color: "#38bdf8" }}>${mc.percentile_50} (50%)</span>
-              <span style={{ color: "#a3e635" }}>${mc.percentile_75} (75%)</span>
-              <span style={{ color: "#22c55e" }}>${mc.percentile_95} (95%)</span>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {tab === "portfolio" && portfolio && (
-        <div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16, marginBottom: 32 }}>
-            <Card label="Ожидаемая доходность" value={`${portfolio.expected_return}% в год`} color="#22c55e" />
-            <Card label="Риск" value={`${portfolio.risk}%`} color="#ef4444" />
-            <Card label="Sharpe Ratio" value={portfolio.sharpe_ratio} color="#38bdf8" />
-          </div>
-          <div style={{
-            background: "#1e293b", borderRadius: 12,
-            padding: "24px", border: "1px solid #334155"
-          }}>
-            <h2 style={{ color: "#38bdf8", marginBottom: 24 }}>
-              Оптимальное распределение
-            </h2>
-            {Object.entries(portfolio.weights).map(([t, weight]) => (
-              <div key={t} style={{ marginBottom: 16 }}>
-                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
-                  <span style={{ color: "#e2e8f0", fontWeight: "bold" }}>{t}</span>
-                  <span style={{ color: "#38bdf8" }}>{weight}%</span>
+          {portfolio && (
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, marginBottom: 24 }}>
+                <Card label="EXPECTED RETURN" value={`${portfolio.expected_return}%/yr`} color={theme.colors.green} />
+                <Card label="RISK" value={`${portfolio.risk}%`} color={theme.colors.red} />
+                <Card label="SHARPE RATIO" value={portfolio.sharpe_ratio} color={theme.colors.yellow} />
+              </div>
+              {Object.entries(portfolio.weights).map(([t, w]) => (
+                <div key={t} style={{ marginBottom: 12 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4, fontFamily: theme.fonts.mono, fontSize: 12 }}>
+                    <span style={{ color: theme.colors.text }}>{t}</span>
+                    <span style={{ color: theme.colors.yellow }}>{w}%</span>
+                  </div>
+                  <div style={{ background: theme.colors.bg, borderRadius: 4, height: 6, overflow: "hidden" }}>
+                    <motion.div
+                      initial={{ width: 0 }}
+                      animate={{ width: `${w}%` }}
+                      transition={{ duration: 0.8 }}
+                      style={{
+                        height: "100%",
+                        background: `linear-gradient(90deg, ${theme.colors.yellow}, ${theme.colors.green})`,
+                        borderRadius: 4,
+                        boxShadow: theme.glow.yellow,
+                      }}
+                    />
+                  </div>
                 </div>
-                <div style={{ background: "#0f172a", borderRadius: 8, height: 8 }}>
-                  <div style={{
-                    background: "linear-gradient(90deg, #38bdf8, #22c55e)",
-                    height: "100%", borderRadius: 8,
-                    width: `${weight}%`,
-                    transition: "width 0.5s ease"
-                  }} />
+              ))}
+            </motion.div>
+          )}
+        </motion.div>
+
+        {/* MARKET — НОВОСТИ */}
+        <SectionHeader id="market" title="MARKET FEED" subtitle="LIVE NEWS" />
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          style={{ marginBottom: 32 }}
+        >
+          {news.slice(0, 6).map((item, i) => (
+            <motion.a
+              key={i}
+              href={item.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              initial={{ opacity: 0, x: -20 }}
+              whileInView={{ opacity: 1, x: 0 }}
+              transition={{ delay: i * 0.07 }}
+              whileHover={{ x: 6, borderColor: theme.colors.yellow }}
+              style={{
+                display: "block",
+                textDecoration: "none",
+                background: theme.colors.bgCard,
+                border: `1px solid ${theme.colors.border}`,
+                borderRadius: 8,
+                padding: "16px 20px",
+                marginBottom: 8,
+                transition: "all 0.2s",
+              }}
+            >
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 16 }}>
+                <div>
+                  <div style={{ color: theme.colors.text, fontFamily: theme.fonts.mono, fontSize: 13, marginBottom: 6 }}>
+                    {item.title}
+                  </div>
+                  <div style={{ color: theme.colors.textSecondary, fontFamily: theme.fonts.mono, fontSize: 11 }}>
+                    {item.summary?.slice(0, 120)}...
+                  </div>
+                </div>
+                <div style={{ minWidth: 80, textAlign: "right" }}>
+                  <div style={{ color: theme.colors.yellow, fontFamily: theme.fonts.mono, fontSize: 10, letterSpacing: 1 }}>
+                    {item.source}
+                  </div>
+                  <div style={{ color: theme.colors.textSecondary, fontFamily: theme.fonts.mono, fontSize: 10, marginTop: 4 }}>
+                    {new Date(item.published).toLocaleDateString()}
+                  </div>
                 </div>
               </div>
-            ))}
-          </div>
-        </div>
-      )}
+            </motion.a>
+          ))}
+        </motion.div>
 
+        {/* HISTORY */}
+        <SectionHeader id="history" title="BACKTEST HISTORY" subtitle="DATABASE" />
+        <HistorySection API={API} />
 
-      {tab === "lstm" && lstm && (
-        <div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16, marginBottom: 32 }}>
-            <Card label="Текущая цена" value={`$${lstm.last_price}`} />
-            <Card label="Прогноз через 30 дней" value={`$${lstm.predicted_price_30d}`} color={lstm.change_30d >= 0 ? "#22c55e" : "#ef4444"} />
-            <Card label="Ожидаемое изменение" value={`${lstm.change_30d}%`} color={lstm.change_30d >= 0 ? "#22c55e" : "#ef4444"} />
-          </div>
-          <div style={{
-            background: "#1e293b", borderRadius: 12,
-            padding: "24px", border: "1px solid #334155"
-          }}>
-            <h2 style={{ color: "#a855f7", marginBottom: 16 }}>
-              Прогноз цены на 30 дней
-            </h2>
-            <div style={{ display: "flex", alignItems: "flex-end", gap: 2, height: 120 }}>
-              {lstm.future_prices.map((price, i) => {
-                const min = Math.min(...lstm.future_prices);
-                const max = Math.max(...lstm.future_prices);
-                const height = ((price - min) / (max - min)) * 100 + 10;
-                const color = price >= lstm.last_price ? "#22c55e" : "#ef4444";
-                return (
-                  <div
-                    key={i}
-                    style={{
-                      flex: 1, height: `${height}%`,
-                      background: color, opacity: 0.7,
-                      borderRadius: "2px 2px 0 0",
-                      transition: "height 0.3s ease"
-                    }}
-                    title={`День ${i+1}: $${price}`}
-                  />
-                );
-              })}
-            </div>
-            <div style={{ display: "flex", justifyContent: "space-between", marginTop: 8, color: "#64748b", fontSize: 12 }}>
-              <span>День 1</span>
-              <span>День 15</span>
-              <span>День 30</span>
-            </div>
-          </div>
-        </div>
-      )}
-
-
-      {!result && !mc && !loading && (
-        <div style={{ color: "#334155", fontSize: 18, textAlign: "center", marginTop: 80 }}>
-          Введи тикер и запустить →
-        </div>
-      )}
+      </div>
     </div>
+  );
+}
+
+function HistorySection({ API }) {
+  const [history, setHistory] = useState([]);
+
+  useEffect(() => {
+    axios.get(`${API}/history`).then(r => setHistory(r.data)).catch(() => {});
+  }, [API]);
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      style={{
+        background: theme.colors.bgCard,
+        border: `1px solid ${theme.colors.border}`,
+        borderRadius: 8,
+        padding: 24,
+      }}
+    >
+      {history.length === 0 ? (
+        <div style={{ color: theme.colors.textSecondary, fontFamily: theme.fonts.mono, fontSize: 12 }}>
+          No backtest history yet. Run a backtest to see results here.
+        </div>
+      ) : (
+        <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: theme.fonts.mono, fontSize: 12 }}>
+          <thead>
+            <tr>
+              {["TICKER", "STRATEGY", "RETURN", "SHARPE", "DRAWDOWN", "TRADES", "DATE"].map(h => (
+                <th key={h} style={{
+                  color: theme.colors.yellow,
+                  textAlign: "left",
+                  padding: "8px 12px",
+                  fontSize: 10,
+                  letterSpacing: 2,
+                  borderBottom: `1px solid ${theme.colors.border}`,
+                }}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {history.map((row, i) => (
+              <motion.tr
+                key={row.id}
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: i * 0.05 }}
+                whileHover={{ background: theme.colors.bgCardHover }}
+                style={{ borderBottom: `1px solid ${theme.colors.border}` }}
+              >
+                <td style={{ padding: "10px 12px", color: theme.colors.yellow }}>{row.ticker}</td>
+                <td style={{ padding: "10px 12px", color: theme.colors.textSecondary }}>{row.strategy.toUpperCase()}</td>
+                <td style={{ padding: "10px 12px", color: row.total_return >= 0 ? theme.colors.green : theme.colors.red }}>
+                  {row.total_return}%
+                </td>
+                <td style={{ padding: "10px 12px", color: theme.colors.text }}>{row.sharpe_ratio}</td>
+                <td style={{ padding: "10px 12px", color: theme.colors.red }}>{row.max_drawdown}%</td>
+                <td style={{ padding: "10px 12px", color: theme.colors.text }}>{row.total_trades}</td>
+                <td style={{ padding: "10px 12px", color: theme.colors.textSecondary }}>
+                  {new Date(row.created_at).toLocaleDateString()}
+                </td>
+              </motion.tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </motion.div>
   );
 }
