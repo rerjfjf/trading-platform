@@ -11,6 +11,8 @@ from typing import List
 from data.loader import load_stock_data
 from strategies.ma_crossover import ma_crossover_strategy
 from strategies.rsi import rsi_strategy
+from strategies.macd import macd_strategy
+from strategies.bollinger_bands import bollinger_bands_strategy
 from backtest.engine import BacktestEngine
 from models.black_scholes import black_scholes, calculate_greeks
 from models.portfolio import optimize_portfolio
@@ -275,4 +277,55 @@ def get_news(ticker: str):
             }
             for n in news[:10]
         ]
+    }
+
+
+
+@app.get("/best-strategy/{ticker}")
+def find_best_strategy(ticker: str, period: str = "2y"):
+    """Автоматически находит лучшую стратегию для акции"""
+    import rust_engine as re
+    from strategies.bollinger_bands import bollinger_bands_strategy
+
+    df = load_stock_data(ticker, period)
+    
+    strategies = {
+        "RSI": rsi_strategy(df.copy()),
+        "MA Crossover": ma_crossover_strategy(df.copy()),
+        "MACD": macd_strategy(df.copy()),
+        "Bollinger Bands": bollinger_bands_strategy(df.copy()),
+    }
+    
+    results = {}
+    for name, df_strat in strategies.items():
+        try:
+            closes = df_strat["Close"].tolist()
+            signals = df_strat["Position"].fillna(0).astype(int).tolist()
+            final_capital, total_return, max_drawdown, total_trades = re.run_backtest(
+                10000.0, closes, signals
+            )
+            returns = df_strat["Close"].pct_change().dropna()
+            sharpe = float(returns.mean() / returns.std() * (252 ** 0.5)) if returns.std() > 0 else 0
+            
+            results[name] = {
+                "total_return": round(float(total_return), 2),
+                "sharpe_ratio": round(sharpe, 2),
+                "max_drawdown": round(float(max_drawdown), 2),
+                "total_trades": int(total_trades),
+                "final_capital": round(float(final_capital), 2),
+                "score": round(float(total_return) * 0.4 + sharpe * 30 - abs(float(max_drawdown)) * 0.3, 2)
+            }
+        except Exception as e:
+            results[name] = {"error": str(e)}
+    
+    # Находим лучшую по score
+    valid = {k: v for k, v in results.items() if "error" not in v}
+    best = max(valid, key=lambda x: valid[x]["score"]) if valid else None
+    
+    return {
+        "ticker": ticker,
+        "period": period,
+        "best_strategy": best,
+        "results": results,
+        "recommendation": f"Для {ticker} лучше всего работает {best} — score {valid[best]['score']}" if best else "Нет данных"
     }
