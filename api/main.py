@@ -221,3 +221,32 @@ def compare_stocks_endpoint(ticker1: str, ticker2: str, period: str = "1y"):
     """Сравнение двух акций"""
     from models.comparison import compare_stocks
     return compare_stocks(ticker1, ticker2, period)
+
+
+@app.get("/dividends/{ticker}")
+def get_dividends(ticker: str):
+    """История дивидендов акции"""
+    import yfinance as yf
+    stock = yf.Ticker(ticker)
+    divs = stock.dividends
+    
+    if divs.empty:
+        return {"ticker": ticker, "dividends": [], "total_annual": 0}
+    
+    # Последние 3 года
+    divs.index = divs.index.tz_localize(None) if divs.index.tz else divs.index
+    recent = divs[divs.index.year >= 2022]
+    
+    # Годовые выплаты
+    annual = recent.groupby(recent.index.year).sum().to_dict()
+    
+    return {
+        "ticker": ticker,
+        "dividends": [
+            {"date": str(d.date()), "amount": round(float(v), 4)}
+            for d, v in recent.items()
+        ],
+        "annual_totals": {str(k): round(float(v), 4) for k, v in annual.items()},
+        "latest_dividend": round(float(divs.iloc[-1]), 4) if not divs.empty else 0,
+        "total_paid_3y": round(float(recent.sum()), 4)
+    }
