@@ -2,6 +2,7 @@ import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+from database.crud import save_backtest, get_backtest_history, save_portfolio, add_to_watchlist, get_watchlist
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -13,6 +14,7 @@ from strategies.rsi import rsi_strategy
 from backtest.engine import BacktestEngine
 from models.black_scholes import black_scholes, calculate_greeks
 from models.portfolio import optimize_portfolio
+
 
 app = FastAPI(title="Trading Platform API", version="1.0.0")
 
@@ -94,6 +96,19 @@ def run_backtest(req: BacktestRequest):
     returns = df["Close"].pct_change().dropna()
     sharpe = round(returns.mean() / returns.std() * (252 ** 0.5), 2) if returns.std() > 0 else 0
 
+    save_backtest(
+        ticker=req.ticker,
+        strategy=req.strategy,
+        period=req.period,
+        initial_capital=10000,
+        final_capital=round(final_capital, 2),
+        total_return=round(total_return, 2),
+        sharpe_ratio=float(sharpe),
+        max_drawdown=round(max_drawdown, 2),
+        total_trades=total_trades
+    )
+
+
     return {
         "ticker": req.ticker,
         "strategy": req.strategy,
@@ -173,3 +188,20 @@ def run_lstm(req: LSTMRequest):
         "change_30d": data["change_30d"],
         "future_prices": [round(p, 2) for p in data["future_prices"].tolist()]
     }
+
+
+@app.get("/history")
+def get_history(ticker: str = None):
+    """История бэктестов"""
+    return get_backtest_history(ticker)
+
+@app.post("/watchlist/{ticker}")
+def add_watchlist(ticker: str, notes: str = None):
+    """Добавить акцию в вотчлист"""
+    success = add_to_watchlist(ticker, notes)
+    return {"success": success, "ticker": ticker}
+
+@app.get("/watchlist")
+def get_watchlist_endpoint():
+    """Получить вотчлист"""
+    return get_watchlist()
