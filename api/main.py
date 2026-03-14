@@ -214,3 +214,10 @@ def remove_watchlist(ticker: str):
     from database.crud import remove_from_watchlist
     success = remove_from_watchlist(ticker)
     return {"success": success, "ticker": ticker}
+
+
+@app.get("/compare/{ticker1}/{ticker2}")
+def compare_stocks_endpoint(ticker1: str, ticker2: str, period: str = "1y"):
+    """Сравнение двух акций"""
+    from models.comparison import compare_stocks
+    return compare_stocks(ticker1, ticker2, period)
