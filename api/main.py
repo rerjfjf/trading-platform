@@ -1,21 +1,28 @@
 import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-import requests as http_requests
+import urllib.request
+import json as json_lib
 from fastapi import FastAPI, Header, HTTPException
 
 AUTH_SERVICE = "http://localhost:3001/auth"
 
 def get_current_user(authorization: str = None):
-    """Проверяем токен через auth сервис"""
     if not authorization:
         return None
     try:
         token = authorization.replace("Bearer ", "")
-        res = http_requests.post(f"{AUTH_SERVICE}/verify", json={"token": token})
-        data = res.json()
-        if data.get("valid"):
-            return data
+        data = json_lib.dumps({"token": token}).encode()
+        req = urllib.request.Request(
+            f"{AUTH_SERVICE}/verify",
+            data=data,
+            headers={"Content-Type": "application/json"},
+            method="POST"
+        )
+        with urllib.request.urlopen(req) as response:
+            result = json_lib.loads(response.read())
+            if result.get("valid"):
+                return result
         return None
     except:
         return None
@@ -101,22 +108,37 @@ def run_backtest(req: BacktestRequest, authorization: str = Header(None)):
     user_data = get_current_user(authorization)
     
     if not user_data:
-        from fastapi import HTTPException
         raise HTTPException(status_code=401, detail="Требуется авторизация")
     
     if not check_plan(user_data, "backtest"):
-        from fastapi import HTTPException
         raise HTTPException(status_code=403, detail="Обновите план для доступа")
     
-    # Проверяем стратегию по плану
     allowed_strategies = user_data.get("limits", {}).get("strategies", [])
     if req.strategy not in allowed_strategies:
-        from fastapi import HTTPException
         raise HTTPException(status_code=403, detail=f"Стратегия {req.strategy} недоступна на вашем плане")
 
-    # Sharpe считаем на Python (пока)
+    import rust_engine as re
+
+    df = load_stock_data(req.ticker, req.period)
+    
+    if req.strategy == "rsi":
+        df = rsi_strategy(df)
+    elif req.strategy == "macd":
+        df = macd_strategy(df)
+    elif req.strategy == "bollinger":
+        df = bollinger_bands_strategy(df)
+    else:
+        df = ma_crossover_strategy(df)
+
+    closes = df["Close"].tolist()
+    signals = df["Position"].fillna(0).astype(int).tolist()
+
+    final_capital, total_return, max_drawdown, total_trades = re.run_backtest(
+        10000.0, closes, signals
+    )
+
     returns = df["Close"].pct_change().dropna()
-    sharpe = round(returns.mean() / returns.std() * (252 ** 0.5), 2) if returns.std() > 0 else 0
+    sharpe = round(float(returns.mean() / returns.std() * (252 ** 0.5)), 2) if returns.std() > 0 else 0
 
     save_backtest(
         ticker=req.ticker,
@@ -130,7 +152,6 @@ def run_backtest(req: BacktestRequest, authorization: str = Header(None)):
         total_trades=total_trades
     )
 
-
     return {
         "ticker": req.ticker,
         "strategy": req.strategy,
@@ -142,7 +163,6 @@ def run_backtest(req: BacktestRequest, authorization: str = Header(None)):
         "total_trades": total_trades,
         "engine": "Rust 🦀"
     }
-
 
 @app.post("/black-scholes")
 def price_option(req: BlackScholesRequest):
