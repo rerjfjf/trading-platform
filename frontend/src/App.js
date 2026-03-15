@@ -4,10 +4,14 @@ import axios from "axios";
 import Navbar from "./components/Navbar";
 import HeroSection from "./components/HeroSection";
 import { theme } from "./styles/theme";
+import AuthModal from "./components/AuthModal";
 
 const API = "http://127.0.0.1:8000";
 
 // Компонент карточки
+
+
+
 const Card = ({ label, value, color }) => (
   <motion.div
     whileHover={{ scale: 1.02, borderColor: theme.colors.yellow }}
@@ -38,6 +42,17 @@ const SectionHeader = ({ id, title, subtitle }) => (
 );
 
 export default function App() {
+  const [user, setUser] = useState(() => {
+  const saved = localStorage.getItem("user");
+  return saved ? JSON.parse(saved) : null;
+});
+const [authOpen, setAuthOpen] = useState(false);
+
+const handleLogout = () => {
+  localStorage.removeItem("token");
+  localStorage.removeItem("user");
+  setUser(null);
+};
   const [ticker, setTicker] = useState("AAPL");
   const [strategy, setStrategy] = useState("rsi");
   const [result, setResult] = useState(null);
@@ -125,7 +140,12 @@ export default function App() {
 
   return (
     <div style={{ background: theme.colors.bg, minHeight: "100vh", color: theme.colors.text }}>
-      <Navbar activeSection={activeSection} />
+      <Navbar
+        activeSection={activeSection}
+        user={user}
+        onLoginClick={() => setAuthOpen(true)}
+        onLogout={handleLogout}
+      />
 
       {/* Hero */}
       <HeroSection />
@@ -473,6 +493,13 @@ export default function App() {
         <HistorySection API={API} />
 
       </div>
+      
+      <AuthModal         
+        isOpen={authOpen}
+        onClose={() => setAuthOpen(false)}
+        onLogin={setUser}
+      />
+      
     </div>
   );
 }

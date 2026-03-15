@@ -22,7 +22,7 @@ const NAV_ITEMS = [
 
 
 
-export default function Navbar({ activeSection }) {
+export default function Navbar({ activeSection, user, onLoginClick, onLogout }) {
   const [time, setTime] = useState(new Date());
   const [marketStatus, setMarketStatus] = useState("OPEN");
   const { t } = useTranslation();
@@ -123,6 +123,62 @@ export default function Navbar({ activeSection }) {
             {marketStatus === "OPEN" ? t("nav.market_open") : t("nav.market_closed")}
           </span>
           <LangSwitch />
+
+          {user ? (
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span style={{ color: theme.colors.yellow, fontFamily: theme.fonts.mono, fontSize: 11 }}>
+                ▶ {user.username}
+                </span>
+                <span style={{
+                color: theme.colors.textSecondary,
+                fontFamily: theme.fonts.mono,
+                fontSize: 10,
+                padding: "2px 8px",
+                border: `1px solid ${theme.colors.border}`,
+                borderRadius: 4,
+                }}>
+                {user.plan?.toUpperCase()}
+                </span>
+                <motion.button
+                whileTap={{ scale: 0.95 }}
+                onClick={onLogout}
+                style={{
+                    background: "transparent",
+                    border: `1px solid ${theme.colors.border}`,
+                    color: theme.colors.textSecondary,
+                    padding: "4px 10px",
+                    borderRadius: 4,
+                    cursor: "pointer",
+                    fontFamily: theme.fonts.mono,
+                    fontSize: 10,
+                    letterSpacing: 1,
+                }}
+                >
+                EXIT
+                </motion.button>
+            </div>
+            ) : (
+            <motion.button
+                whileHover={{ borderColor: theme.colors.yellow, color: theme.colors.yellow }}
+                whileTap={{ scale: 0.95 }}
+                onClick={onLoginClick}
+                style={{
+                background: "transparent",
+                border: `1px solid ${theme.colors.border}`,
+                color: theme.colors.textSecondary,
+                padding: "6px 16px",
+                borderRadius: 4,
+                cursor: "pointer",
+                fontFamily: theme.fonts.mono,
+                fontSize: 11,
+                letterSpacing: 2,
+                transition: "all 0.2s",
+                }}
+            >
+                LOGIN
+            </motion.button>
+            )}
+
         </div>
         <span style={{ color: theme.colors.textSecondary, fontFamily: theme.fonts.mono }}>
           {time.toLocaleTimeString("en-US", { hour12: false })}
