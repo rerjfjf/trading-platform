@@ -69,26 +69,40 @@ const handleLogout = () => {
   useEffect(() => {
     axios.get(`${API}/news/AAPL`).then(r => setNews(r.data.news)).catch(() => {});
   }, []);
+  
+  const getHeaders = () => {
+  const token = localStorage.getItem("token");
+  return token ? { Authorization: `Bearer ${token}` } : {};
+};
 
-  const runBacktest = async () => {
-    setLoading(true);
-    try {
-      const [b, s] = await Promise.all([
-        axios.post(`${API}/backtest`, { ticker, period: "2y", strategy }),
-        axios.get(`${API}/stock/${ticker}`)
-      ]);
-      setResult(b.data);
-      setStock(s.data);
-    } catch (e) { alert("Ошибка сервера"); }
-    setLoading(false);
-  };
-
+const runBacktest = async () => {
+  setLoading(true);
+  try {
+    const [b, s] = await Promise.all([
+      axios.post(`${API}/backtest`, { ticker, period: "2y", strategy }, { headers: getHeaders() }),
+      axios.get(`${API}/stock/${ticker}`, { headers: getHeaders() })
+    ]);
+    setResult(b.data);
+    setStock(s.data);
+  } catch (e) {
+    const msg = e.response?.data?.detail || "Ошибка сервера";
+    alert(msg);
+  }
+  setLoading(false);
+};
   const runMonteCarlo = async () => {
     setLoading(true);
     try {
-      const r = await axios.post(`${API}/monte-carlo`, { ticker, days: 126, simulations: 1000 });
+      const r = await axios.post(
+        `${API}/monte-carlo`, 
+        { ticker, days: 126, simulations: 1000 }, 
+        { headers: getHeaders() }  // ← добавляем третьим аргументом
+      );
       setMc(r.data);
-    } catch (e) { alert("Ошибка сервера"); }
+    } catch (e) { 
+      const msg = e.response?.data?.detail || "Ошибка сервера";
+      alert(msg);
+    }
     setLoading(false);
   };
 
@@ -96,18 +110,32 @@ const handleLogout = () => {
     setLoading(true);
     try {
       const tickers = portfolioTickers.split(",").map(t => t.trim().toUpperCase());
-      const r = await axios.post(`${API}/portfolio/optimize`, { tickers, period: "2y", simulations: 3000 });
+      const r = await axios.post(
+        `${API}/portfolio/optimize`,
+        { tickers, period: "2y", simulations: 3000 },
+        { headers: getHeaders() }
+      );
       setPortfolio(r.data);
-    } catch (e) { alert("Ошибка сервера"); }
+    } catch (e) { 
+      const msg = e.response?.data?.detail || "Ошибка сервера";
+      alert(msg);
+    }
     setLoading(false);
   };
 
   const runLstm = async () => {
     setLoading(true);
     try {
-      const r = await axios.post(`${API}/lstm`, { ticker, period: "5y", epochs: 50, predict_days: 30 });
+      const r = await axios.post(
+        `${API}/lstm`,
+        { ticker, period: "5y", epochs: 50, predict_days: 30 },
+        { headers: getHeaders() }
+      );
       setLstm(r.data);
-    } catch (e) { alert("Ошибка сервера"); }
+    } catch (e) { 
+      const msg = e.response?.data?.detail || "Ошибка сервера";
+      alert(msg);
+    }
     setLoading(false);
   };
 
@@ -137,6 +165,8 @@ const handleLogout = () => {
   });
 
   const returnColor = (val) => val >= 0 ? theme.colors.green : theme.colors.red;
+  
+
 
   return (
     <div style={{ background: theme.colors.bg, minHeight: "100vh", color: theme.colors.text }}>

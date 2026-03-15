@@ -1,6 +1,32 @@
 import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import requests as http_requests
+from fastapi import FastAPI, Header, HTTPException
+
+AUTH_SERVICE = "http://localhost:3001/auth"
+
+def get_current_user(authorization: str = None):
+    """Проверяем токен через auth сервис"""
+    if not authorization:
+        return None
+    try:
+        token = authorization.replace("Bearer ", "")
+        res = http_requests.post(f"{AUTH_SERVICE}/verify", json={"token": token})
+        data = res.json()
+        if data.get("valid"):
+            return data
+        return None
+    except:
+        return None
+
+def check_plan(user_data: dict, feature: str) -> bool:
+    """Проверяем доступ к фиче по плану"""
+    if not user_data:
+        return False
+    limits = user_data.get("limits", {})
+    features = limits.get("features", [])
+    return "all" in features or feature in features
 
 from database.crud import save_backtest, get_backtest_history, save_portfolio, add_to_watchlist, get_watchlist
 from fastapi import FastAPI
@@ -71,28 +97,22 @@ def get_stock(ticker: str, period: str = "1y"):
     }
 
 @app.post("/backtest")
-def run_backtest(req: BacktestRequest):
-    """Запустить бэктест стратегии — использует Rust движок"""
-    import rust_engine as re
-    import numpy as np
-
-    df = load_stock_data(req.ticker, req.period)
+def run_backtest(req: BacktestRequest, authorization: str = Header(None)):
+    user_data = get_current_user(authorization)
     
-    if req.strategy == "rsi":
-        df = rsi_strategy(df)
-    elif req.strategy == "macd":
-        from strategies.macd import macd_strategy
-        df = macd_strategy(df)
-    else:
-        df = ma_crossover_strategy(df)
-
-    closes = df["Close"].tolist()
-    signals = df["Position"].fillna(0).astype(int).tolist()
-
-    # Rust считает бэктест
-    final_capital, total_return, max_drawdown, total_trades = re.run_backtest(
-        10000.0, closes, signals
-    )
+    if not user_data:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=401, detail="Требуется авторизация")
+    
+    if not check_plan(user_data, "backtest"):
+        from fastapi import HTTPException
+        raise HTTPException(status_code=403, detail="Обновите план для доступа")
+    
+    # Проверяем стратегию по плану
+    allowed_strategies = user_data.get("limits", {}).get("strategies", [])
+    if req.strategy not in allowed_strategies:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=403, detail=f"Стратегия {req.strategy} недоступна на вашем плане")
 
     # Sharpe считаем на Python (пока)
     returns = df["Close"].pct_change().dropna()
