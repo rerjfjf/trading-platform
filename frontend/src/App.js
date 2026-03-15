@@ -5,6 +5,7 @@ import Navbar from "./components/Navbar";
 import HeroSection from "./components/HeroSection";
 import { theme } from "./styles/theme";
 import AuthModal from "./components/AuthModal";
+import AdminPanel from "./pages/AdminPanel";
 
 const API = "http://127.0.0.1:8000";
 
@@ -64,6 +65,7 @@ const handleLogout = () => {
   const [news, setNews] = useState([]);
   const [loading, setLoading] = useState(false);
   const [activeSection, setActiveSection] = useState("DASHBOARD");
+  const [adminOpen, setAdminOpen] = useState(false);
 
   // Загружаем новости при старте
   useEffect(() => {
@@ -523,6 +525,10 @@ const runBacktest = async () => {
         <HistorySection API={API} />
 
       </div>
+      <AdminPanel
+        user={user}
+        onClose={() => setAdminOpen(false)}
+      />
       
       <AuthModal         
         isOpen={authOpen}

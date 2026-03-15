@@ -155,6 +155,27 @@ export default function Navbar({ activeSection, user, onLoginClick, onLogout }) 
                 }}
                 >
                 EXIT
+
+
+                {user?.is_admin && (
+                    <motion.button
+                        whileTap={{ scale: 0.95 }}
+                        onClick={onAdminClick}
+                        style={{
+                        background: "transparent",
+                        border: `1px solid ${theme.colors.yellow}`,
+                        color: theme.colors.yellow,
+                        padding: "4px 10px",
+                        borderRadius: 4,
+                        cursor: "pointer",
+                        fontFamily: theme.fonts.mono,
+                        fontSize: 10,
+                        letterSpacing: 1,
+                        }}
+                    >
+                        ADMIN
+                    </motion.button>
+                    )}
                 </motion.button>
             </div>
             ) : (
