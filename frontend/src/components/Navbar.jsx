@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { theme } from "../styles/theme";
+import { useTranslation } from "react-i18next";
+import LangSwitch from "./LangSwitch";
 
 const ASCII_LOGO = `
  ████████╗██████╗  █████╗ ██████╗ ███████╗
@@ -11,16 +13,20 @@ const ASCII_LOGO = `
 `.trim();
 
 const NAV_ITEMS = [
-  { label: "DASHBOARD", path: "#dashboard" },
-  { label: "RESEARCH", path: "#research" },
-  { label: "MARKET", path: "#market" },
-  { label: "MODELS", path: "#models" },
-  { label: "HISTORY", path: "#history" },
+  { label: "DASHBOARD", path: "#dashboard", key: "nav.dashboard" },
+  { label: "RESEARCH", path: "#research", key: "nav.research" },
+  { label: "MARKET", path: "#market", key: "nav.market" },
+  { label: "MODELS", path: "#models", key: "nav.models" },
+  { label: "HISTORY", path: "#history", key: "nav.history" },
 ];
+
+
 
 export default function Navbar({ activeSection }) {
   const [time, setTime] = useState(new Date());
   const [marketStatus, setMarketStatus] = useState("OPEN");
+  const { t } = useTranslation();
+
 
   useEffect(() => {
     const timer = setInterval(() => setTime(new Date()), 1000);
@@ -93,7 +99,7 @@ export default function Navbar({ activeSection }) {
               cursor: "pointer",
             }}
           >
-            {item.label}
+            {t(item.key)}
           </motion.a>
         ))}
       </div>
@@ -114,8 +120,9 @@ export default function Navbar({ activeSection }) {
             fontFamily: theme.fonts.mono,
             letterSpacing: 1,
           }}>
-            NYSE {marketStatus}
+            {marketStatus === "OPEN" ? t("nav.market_open") : t("nav.market_closed")}
           </span>
+          <LangSwitch />
         </div>
         <span style={{ color: theme.colors.textSecondary, fontFamily: theme.fonts.mono }}>
           {time.toLocaleTimeString("en-US", { hour12: false })}
