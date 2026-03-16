@@ -437,3 +437,33 @@ def track_portfolio(req: dict, authorization: str = Header(None)):
         "total_pnl_pct": round(total_pnl_pct, 2),
         "positions": positions
     }
+
+
+
+
+@app.post("/portfolio/save")
+def save_portfolio(req: dict, authorization: str = Header(None)):
+    """Сохранить портфель пользователя"""
+    user_data = get_current_user(authorization)
+    if not user_data:
+        raise HTTPException(status_code=401, detail="Требуется авторизация")
+    
+    from database.crud import save_portfolio_holdings
+    user_id = user_data["user"]["id"]
+    holdings = req.get("holdings", [])
+    save_portfolio_holdings(user_id, holdings)
+    return {"success": True, "message": "Портфель сохранён"}
+
+@app.get("/portfolio/load")
+def load_portfolio(authorization: str = Header(None)):
+    """Загрузить портфель пользователя"""
+    user_data = get_current_user(authorization)
+    if not user_data:
+        raise HTTPException(status_code=401, detail="Требуется авторизация")
+    
+    from database.crud import get_portfolio_holdings
+    user_id = user_data["user"]["id"]
+    holdings = get_portfolio_holdings(user_id)
+    return {"holdings": holdings}
+
+

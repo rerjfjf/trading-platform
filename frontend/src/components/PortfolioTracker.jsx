@@ -45,6 +45,46 @@ export default function PortfolioTracker({ getHeaders }) {
     setLoading(false);
   };
 
+  const savePortfolio = async () => {
+  try {
+      await axios.post(
+      `${API}/portfolio/save`,
+      { holdings: holdings.map(h => ({
+            ticker: h.ticker,
+            shares: parseFloat(h.shares),
+            avg_price: parseFloat(h.avg_price)
+        }))},
+        { headers: getHeaders() }
+        );
+        alert("Портфель сохранён ✅");
+    } catch (e) {
+        alert(e.response?.data?.detail || "Ошибка сохранения");
+    }
+    };
+
+    const loadPortfolio = async () => {
+    try {
+        const r = await axios.get(`${API}/portfolio/load`, { headers: getHeaders() });
+        if (r.data.holdings.length > 0) {
+        setHoldings(r.data.holdings.map(h => ({
+            ticker: h.ticker,
+            shares: String(h.shares),
+            avg_price: String(h.avg_price)
+        })));
+        } else {
+        alert("Сохранённый портфель пуст");
+        }
+    } catch (e) {
+        alert(e.response?.data?.detail || "Ошибка загрузки");
+    }
+    };
+
+
+
+
+
+
+
   const inputStyle = {
     background: theme.colors.bg,
     border: `1px solid ${theme.colors.border}`,
@@ -134,12 +174,12 @@ export default function PortfolioTracker({ getHeaders }) {
       </div>
 
       {/* Кнопки */}
-      <div style={{ display: "flex", gap: 12, marginBottom: 24 }}>
+      <div style={{ display: "flex", gap: 12, marginBottom: 24, flexWrap: "wrap" }}>
         <motion.button
-          whileHover={{ borderColor: theme.colors.yellow }}
-          whileTap={{ scale: 0.95 }}
-          onClick={addHolding}
-          style={{
+            whileHover={{ borderColor: theme.colors.yellow }}
+            whileTap={{ scale: 0.95 }}
+            onClick={addHolding}
+            style={{
             background: "transparent",
             border: `1px solid ${theme.colors.border}`,
             color: theme.colors.textSecondary,
@@ -149,16 +189,16 @@ export default function PortfolioTracker({ getHeaders }) {
             fontFamily: theme.fonts.mono,
             fontSize: 11,
             letterSpacing: 1,
-          }}
+            }}
         >
-          + ДОБАВИТЬ
+            + ДОБАВИТЬ
         </motion.button>
         <motion.button
-          whileHover={{ background: theme.colors.yellowGlow, boxShadow: theme.glow.yellow }}
-          whileTap={{ scale: 0.95 }}
-          onClick={trackPortfolio}
-          disabled={loading}
-          style={{
+            whileHover={{ background: theme.colors.yellowGlow, boxShadow: theme.glow.yellow }}
+            whileTap={{ scale: 0.95 }}
+            onClick={trackPortfolio}
+            disabled={loading}
+            style={{
             background: "transparent",
             border: `1px solid ${theme.colors.yellow}`,
             color: theme.colors.yellow,
@@ -170,9 +210,45 @@ export default function PortfolioTracker({ getHeaders }) {
             letterSpacing: 2,
             fontWeight: "bold",
             transition: "all 0.2s",
-          }}
+            }}
         >
-          {loading ? "ЗАГРУЗКА..." : "▶ ОТСЛЕЖИВАТЬ"}
+            {loading ? "ЗАГРУЗКА..." : "▶ ОТСЛЕЖИВАТЬ"}
+        </motion.button>
+        <motion.button
+            whileHover={{ background: "rgba(0,255,136,0.1)" }}
+            whileTap={{ scale: 0.95 }}
+            onClick={savePortfolio}
+            style={{
+            background: "transparent",
+            border: `1px solid ${theme.colors.green}`,
+            color: theme.colors.green,
+            padding: "8px 16px",
+            borderRadius: 4,
+            cursor: "pointer",
+            fontFamily: theme.fonts.mono,
+            fontSize: 11,
+            letterSpacing: 1,
+            }}
+        >
+            💾 СОХРАНИТЬ
+        </motion.button>
+        <motion.button
+            whileHover={{ borderColor: theme.colors.yellow }}
+            whileTap={{ scale: 0.95 }}
+            onClick={loadPortfolio}
+            style={{
+            background: "transparent",
+            border: `1px solid ${theme.colors.border}`,
+            color: theme.colors.textSecondary,
+            padding: "8px 16px",
+            borderRadius: 4,
+            cursor: "pointer",
+            fontFamily: theme.fonts.mono,
+            fontSize: 11,
+            letterSpacing: 1,
+            }}
+        >
+            📂 ЗАГРУЗИТЬ
         </motion.button>
       </div>
 

@@ -1,6 +1,7 @@
 from database.models import SessionLocal, BacktestResult, PortfolioResult, WatchList
 from datetime import datetime
 import json
+from database.models import SessionLocal, BacktestResult, PortfolioResult, WatchList, Portfolio
 
 def save_backtest(ticker, strategy, period, initial_capital, 
                   final_capital, total_return, sharpe_ratio, 
@@ -109,5 +110,42 @@ def remove_from_watchlist(ticker: str):
             db.commit()
             return True
         return False
+    finally:
+        db.close()
+
+
+def save_portfolio_holdings(user_id: int, holdings: list):
+    """Сохраняем портфель пользователя"""
+    db = SessionLocal()
+    try:
+        # Удаляем старый портфель
+        db.query(Portfolio).filter(Portfolio.user_id == user_id).delete()
+        # Сохраняем новый
+        for h in holdings:
+            item = Portfolio(
+                user_id=user_id,
+                ticker=h["ticker"],
+                shares=h["shares"],
+                avg_price=h["avg_price"]
+            )
+            db.add(item)
+        db.commit()
+        return True
+    finally:
+        db.close()
+
+def get_portfolio_holdings(user_id: int) -> list:
+    """Получаем портфель пользователя"""
+    db = SessionLocal()
+    try:
+        items = db.query(Portfolio).filter(Portfolio.user_id == user_id).all()
+        return [
+            {
+                "ticker": i.ticker,
+                "shares": i.shares,
+                "avg_price": i.avg_price
+            }
+            for i in items
+        ]
     finally:
         db.close()

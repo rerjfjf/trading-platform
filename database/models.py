@@ -46,6 +46,17 @@ class WatchList(Base):
     added_at = Column(DateTime, default=datetime.utcnow)
     notes = Column(String, nullable=True)
 
+class Portfolio(Base):
+    __tablename__ = "portfolios"
+    
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, nullable=False)
+    ticker = Column(String, nullable=False)
+    shares = Column(Float, nullable=False)
+    avg_price = Column(Float, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    
 def init_db():
     """Создаём таблицы"""
     Base.metadata.create_all(engine)
