@@ -6,6 +6,7 @@ import HeroSection from "./components/HeroSection";
 import { theme } from "./styles/theme";
 import AuthModal from "./components/AuthModal";
 import AdminPanel from "./pages/AdminPanel";
+import PortfolioTracker from "./components/PortfolioTracker";
 
 const API = "http://127.0.0.1:8000";
 
@@ -404,6 +405,7 @@ const runBacktest = async () => {
 
         {/* PORTFOLIO */}
         <SectionHeader id="models" title="PORTFOLIO OPTIMIZATION" subtitle="MARKOWITZ MODEL" />
+        <PortfolioTracker getHeaders={getHeaders} />
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}

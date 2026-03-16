@@ -376,3 +376,64 @@ def run_stress_test(ticker: str, portfolio_value: float = 10000):
     """Stress testing — поведение в исторических кризисах"""
     from models.stress_test import stress_test
     return stress_test(ticker, portfolio_value)
+
+
+
+
+
+
+@app.post("/portfolio/track")
+def track_portfolio(req: dict, authorization: str = Header(None)):
+    """Трекер реального портфеля"""
+    user_data = get_current_user(authorization)
+    if not user_data:
+        raise HTTPException(status_code=401, detail="Требуется авторизация")
+    
+    holdings = req.get("holdings", [])
+    # holdings = [{"ticker": "AAPL", "shares": 10, "avg_price": 150.0}, ...]
+    
+    total_value = 0
+    total_cost = 0
+    positions = []
+    
+    for h in holdings:
+        try:
+            df = load_stock_data(h["ticker"], "1d")
+            current_price = float(df["Close"].iloc[-1])
+            shares = float(h["shares"])
+            avg_price = float(h["avg_price"])
+            
+            value = current_price * shares
+            cost = avg_price * shares
+            pnl = value - cost
+            pnl_pct = (current_price / avg_price - 1) * 100
+            
+            total_value += value
+            total_cost += cost
+            
+            positions.append({
+                "ticker": h["ticker"],
+                "shares": shares,
+                "avg_price": round(avg_price, 2),
+                "current_price": round(current_price, 2),
+                "value": round(value, 2),
+                "cost": round(cost, 2),
+                "pnl": round(pnl, 2),
+                "pnl_pct": round(pnl_pct, 2),
+            })
+        except Exception as e:
+            positions.append({
+                "ticker": h["ticker"],
+                "error": str(e)
+            })
+    
+    total_pnl = total_value - total_cost
+    total_pnl_pct = (total_value / total_cost - 1) * 100 if total_cost > 0 else 0
+    
+    return {
+        "total_value": round(total_value, 2),
+        "total_cost": round(total_cost, 2),
+        "total_pnl": round(total_pnl, 2),
+        "total_pnl_pct": round(total_pnl_pct, 2),
+        "positions": positions
+    }
