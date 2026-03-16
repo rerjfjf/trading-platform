@@ -4,6 +4,8 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import urllib.request
 import json as json_lib
 from fastapi import FastAPI, Header, HTTPException
+from dotenv import load_dotenv
+load_dotenv()
 
 AUTH_SERVICE = "http://localhost:3001/auth"
 
@@ -467,3 +469,44 @@ def load_portfolio(authorization: str = Header(None)):
     return {"holdings": holdings}
 
 
+@app.post("/ai/chat")
+def ai_chat(req: dict, authorization: str = Header(None)):
+    """AI ассистент через DeepSeek"""
+    user_data = get_current_user(authorization)
+    if not user_data:
+        raise HTTPException(status_code=401, detail="Требуется авторизация")
+    
+    messages = req.get("messages", [])
+    
+    import urllib.request
+    import json as json_lib
+    
+    payload = json_lib.dumps({
+        "model": "deepseek-chat",
+        "max_tokens": 1000,
+        "messages": [
+            {
+                "role": "system",
+                "content": """Ты AI ассистент торговой платформы TRADE_SYS.
+Помогаешь трейдерам анализировать акции и принимать решения.
+Отвечай кратко и по делу. Платформа умеет: бэктестинг (RSI, MA, MACD, Bollinger),
+Monte Carlo, LSTM нейросеть, Блэк-Шоулз, Марковиц, VaR, stress testing.
+Отвечай на том языке на котором тебя спрашивают."""
+            },
+            *messages
+        ]
+    }).encode()
+    
+    req_obj = urllib.request.Request(
+        "https://api.deepseek.com/v1/chat/completions",
+        data=payload,
+        headers={
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {os.environ.get('DEEPSEEK_KEY', '')}"
+        },
+        method="POST"
+    )
+    
+    with urllib.request.urlopen(req_obj) as response:
+        result = json_lib.loads(response.read())
+        return {"content": result["choices"][0]["message"]["content"]}

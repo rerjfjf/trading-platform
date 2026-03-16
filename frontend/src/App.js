@@ -7,6 +7,7 @@ import { theme } from "./styles/theme";
 import AuthModal from "./components/AuthModal";
 import AdminPanel from "./pages/AdminPanel";
 import PortfolioTracker from "./components/PortfolioTracker";
+import AIAssistant from "./components/AIAssistant";
 
 const API = "http://127.0.0.1:8000";
 
@@ -535,6 +536,8 @@ const runBacktest = async () => {
         />
       )}
 
+      <AIAssistant user={user} />
+      
       <AuthModal         
         isOpen={authOpen}
         onClose={() => setAuthOpen(false)}
