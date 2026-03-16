@@ -22,7 +22,7 @@ const NAV_ITEMS = [
 
 
 
-export default function Navbar({ activeSection, user, onLoginClick, onLogout }) {
+export default function Navbar({ activeSection, user, onLoginClick, onLogout, onAdminClick }) {
   const [time, setTime] = useState(new Date());
   const [marketStatus, setMarketStatus] = useState("OPEN");
   const { t } = useTranslation();
@@ -139,6 +139,26 @@ export default function Navbar({ activeSection, user, onLoginClick, onLogout }) 
                 }}>
                 {user.plan?.toUpperCase()}
                 </span>
+
+                {user?.is_admin && (
+                <motion.button
+                    whileTap={{ scale: 0.95 }}
+                    onClick={onAdminClick}
+                    style={{
+                    background: "transparent",
+                    border: `1px solid ${theme.colors.yellow}`,
+                    color: theme.colors.yellow,
+                    padding: "4px 10px",
+                    borderRadius: 4,
+                    cursor: "pointer",
+                    fontFamily: theme.fonts.mono,
+                    fontSize: 10,
+                    letterSpacing: 1,
+                    }}
+                >
+                    ADMIN
+                </motion.button>
+                )}
                 <motion.button
                 whileTap={{ scale: 0.95 }}
                 onClick={onLogout}
@@ -154,28 +174,7 @@ export default function Navbar({ activeSection, user, onLoginClick, onLogout }) 
                     letterSpacing: 1,
                 }}
                 >
-                EXIT
-
-
-                {user?.is_admin && (
-                    <motion.button
-                        whileTap={{ scale: 0.95 }}
-                        onClick={onAdminClick}
-                        style={{
-                        background: "transparent",
-                        border: `1px solid ${theme.colors.yellow}`,
-                        color: theme.colors.yellow,
-                        padding: "4px 10px",
-                        borderRadius: 4,
-                        cursor: "pointer",
-                        fontFamily: theme.fonts.mono,
-                        fontSize: 10,
-                        letterSpacing: 1,
-                        }}
-                    >
-                        ADMIN
-                    </motion.button>
-                    )}
+                    EXIT
                 </motion.button>
             </div>
             ) : (

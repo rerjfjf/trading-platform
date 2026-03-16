@@ -177,6 +177,7 @@ const runBacktest = async () => {
         user={user}
         onLoginClick={() => setAuthOpen(true)}
         onLogout={handleLogout}
+        onAdminClick={() => setAdminOpen(true)}
       />
 
       {/* Hero */}
@@ -525,11 +526,13 @@ const runBacktest = async () => {
         <HistorySection API={API} />
 
       </div>
-      <AdminPanel
-        user={user}
-        onClose={() => setAdminOpen(false)}
-      />
-      
+      {adminOpen && (
+        <AdminPanel
+          user={user}
+          onClose={() => setAdminOpen(false)}
+        />
+      )}
+
       <AuthModal         
         isOpen={authOpen}
         onClose={() => setAuthOpen(false)}
