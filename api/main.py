@@ -471,42 +471,36 @@ def load_portfolio(authorization: str = Header(None)):
 
 @app.post("/ai/chat")
 def ai_chat(req: dict, authorization: str = Header(None)):
-    """AI ассистент через DeepSeek"""
     user_data = get_current_user(authorization)
     if not user_data:
         raise HTTPException(status_code=401, detail="Требуется авторизация")
     
+    import httpx
     messages = req.get("messages", [])
     
-    import urllib.request
-    import json as json_lib
-    
-    payload = json_lib.dumps({
-        "model": "deepseek-chat",
-        "max_tokens": 1000,
-        "messages": [
-            {
-                "role": "system",
-                "content": """Ты AI ассистент торговой платформы TRADE_SYS.
-Помогаешь трейдерам анализировать акции и принимать решения.
+    with httpx.Client() as client:
+        response = client.post(
+            "https://api.groq.com/openai/v1/chat/completions",
+            headers={
+                "Authorization": f"Bearer {os.environ.get('GROQ_KEY', '')}",
+                "Content-Type": "application/json"
+            },
+            json={
+                "model": "llama-3.3-70b-versatile",
+                "max_tokens": 1000,
+                "messages": [
+                    {
+                        "role": "system",
+                        "content": """Ты AI ассистент торговой платформы TRADE_SYS.
+Помогаешь трейдерам и инвесторам анализировать акции.
 Отвечай кратко и по делу. Платформа умеет: бэктестинг (RSI, MA, MACD, Bollinger),
 Monte Carlo, LSTM нейросеть, Блэк-Шоулз, Марковиц, VaR, stress testing.
 Отвечай на том языке на котором тебя спрашивают."""
+                    },
+                    *messages
+                ]
             },
-            *messages
-        ]
-    }).encode()
-    
-    req_obj = urllib.request.Request(
-        "https://api.deepseek.com/v1/chat/completions",
-        data=payload,
-        headers={
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {os.environ.get('DEEPSEEK_KEY', '')}"
-        },
-        method="POST"
-    )
-    
-    with urllib.request.urlopen(req_obj) as response:
-        result = json_lib.loads(response.read())
+            timeout=30.0
+        )
+        result = response.json()
         return {"content": result["choices"][0]["message"]["content"]}
