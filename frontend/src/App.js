@@ -8,6 +8,7 @@ import AuthModal from "./components/AuthModal";
 import AdminPanel from "./pages/AdminPanel";
 import PortfolioTracker from "./components/PortfolioTracker";
 import AIAssistant from "./components/AIAssistant";
+import Screener from "./components/Screener";
 
 const API = "http://127.0.0.1:8000";
 
@@ -525,6 +526,9 @@ const runBacktest = async () => {
         </motion.div>
 
         {/* HISTORY */}
+        <SectionHeader id="research" title="STOCK SCREENER" subtitle="MARKET SCANNER" />
+        <Screener getHeaders={getHeaders} />
+        
         <SectionHeader id="history" title="BACKTEST HISTORY" subtitle="DATABASE" />
         <HistorySection API={API} />
 

@@ -504,3 +504,32 @@ Monte Carlo, LSTM нейросеть, Блэк-Шоулз, Марковиц, VaR
         )
         result = response.json()
         return {"content": result["choices"][0]["message"]["content"]}
+    
+
+
+
+@app.get("/screener")
+def run_screener(
+    min_return: float = None,
+    max_volatility: float = None,
+    min_sharpe: float = None,
+    max_rsi: float = None,
+    min_rsi: float = None,
+    ma_signal: str = None,
+    authorization: str = Header(None)
+):
+    """Скринер акций по параметрам"""
+    user_data = get_current_user(authorization)
+    if not user_data:
+        raise HTTPException(status_code=401, detail="Требуется авторизация")
+    
+    from models.screener import screen_stocks
+    results = screen_stocks(
+        min_return=min_return,
+        max_volatility=max_volatility,
+        min_sharpe=min_sharpe,
+        max_rsi=max_rsi,
+        min_rsi=min_rsi,
+        ma_signal=ma_signal,
+    )
+    return {"results": results, "count": len(results)}
