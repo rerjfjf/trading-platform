@@ -9,8 +9,9 @@ import AdminPanel from "./pages/AdminPanel";
 import PortfolioTracker from "./components/PortfolioTracker";
 import AIAssistant from "./components/AIAssistant";
 import Screener from "./components/Screener";
+import { API_BASE_URL } from "./config";
 
-const API = "http://127.0.0.1:8000";
+const API = API_BASE_URL;
 
 // Компонент карточки
 

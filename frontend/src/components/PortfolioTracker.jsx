@@ -2,8 +2,9 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import axios from "axios";
 import { theme } from "../styles/theme";
+import { API_BASE_URL } from "../config";
 
-const API = "http://127.0.0.1:8000";
+const API = API_BASE_URL;
 
 export default function PortfolioTracker({ getHeaders }) {
   const [holdings, setHoldings] = useState([

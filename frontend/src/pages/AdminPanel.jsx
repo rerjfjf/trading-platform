@@ -2,8 +2,9 @@ import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import axios from "axios";
 import { theme } from "../styles/theme";
+import { AUTH_API_BASE } from "../config";
 
-const AUTH_API = "http://localhost:3001";
+const AUTH_API = AUTH_API_BASE;
 
 export default function AdminPanel({ user, onClose }) {
   const [users, setUsers] = useState([]);

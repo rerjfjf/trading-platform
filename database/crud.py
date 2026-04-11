@@ -1,6 +1,7 @@
-from database.models import SessionLocal, BacktestResult, PortfolioResult, WatchList
 from datetime import datetime
-import json
+
+from sqlalchemy.exc import IntegrityError
+
 from database.models import SessionLocal, BacktestResult, PortfolioResult, WatchList, Portfolio
 
 def save_backtest(ticker, strategy, period, initial_capital, 
@@ -77,7 +78,7 @@ def add_to_watchlist(ticker: str, notes: str = None):
         db.add(item)
         db.commit()
         return True
-    except:
+    except IntegrityError:
         db.rollback()
         return False
     finally:

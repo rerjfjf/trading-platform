@@ -2,7 +2,9 @@ rust_engine/target/
 node_modules/
 venv/
 .venv/
+.ci_venv/
 __pycache__/
 *.pyc
 .DS_Store
 .env
+auth-service/.env

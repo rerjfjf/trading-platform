@@ -2,8 +2,7 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import axios from "axios";
 import { theme } from "../styles/theme";
-
-const AUTH_API = "http://localhost:3001/auth";
+import { AUTH_API } from "../config";
 
 export default function AuthModal({ isOpen, onClose, onLogin }) {
   const [mode, setMode] = useState("login"); // login | register

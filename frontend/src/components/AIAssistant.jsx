@@ -1,9 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { theme } from "../styles/theme";
-
-const DEEPSEEK_API = "https://api.deepseek.com/v1/chat/completions";
-const API_KEY = process.env.REACT_APP_DEEPSEEK_KEY;
+import { API_BASE_URL } from "../config";
 
 export default function AIAssistant({ user }) {
   const [isOpen, setIsOpen] = useState(false);
@@ -30,31 +28,55 @@ export default function AIAssistant({ user }) {
     setLoading(true);
 
     try {
-    const response = await fetch("http://127.0.0.1:8000/ai/chat", {
+      const response = await fetch(`${API_BASE_URL}/ai/chat`, {
         method: "POST",
         headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${localStorage.getItem("token")}`
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
         },
         body: JSON.stringify({
-        messages: [
-            ...messages.map(m => ({ role: m.role, content: m.content })),
-            userMessage
-        ]
-        })
-    });
+          messages: [
+            ...messages.map((m) => ({ role: m.role, content: m.content })),
+            userMessage,
+          ],
+        }),
+      });
 
-    const data = await response.json();
-    const assistantMessage = {
-        role: "assistant",
-        content: data.content
-    };
-    setMessages(prev => [...prev, assistantMessage]);
+      let data;
+      try {
+        data = await response.json();
+      } catch {
+        throw new Error("Некорректный ответ сервера");
+      }
+
+      if (!response.ok) {
+        const detail = data?.detail;
+        const text =
+          typeof detail === "string"
+            ? detail
+            : Array.isArray(detail)
+              ? detail.map((d) => d.msg || d).join("; ")
+              : "Ошибка сервера";
+        setMessages((prev) => [
+          ...prev,
+          { role: "assistant", content: text },
+        ]);
+        return;
+      }
+
+      setMessages((prev) => [
+        ...prev,
+        { role: "assistant", content: data.content || "Пустой ответ" },
+      ]);
     } catch (e) {
-    setMessages(prev => [...prev, {
-        role: "assistant",
-        content: "Ошибка соединения. Попробуй ещё раз."
-    }]);
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "assistant",
+          content:
+            e.message || "Ошибка соединения. Попробуй ещё раз.",
+        },
+      ]);
     }
     setLoading(false);
   };

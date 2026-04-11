@@ -1,9 +1,13 @@
+import os
 from sqlalchemy import create_engine, Column, Integer, Float, String, DateTime, JSON
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from datetime import datetime
 
-DATABASE_URL = "postgresql://nikitasokovyh@localhost:5432/trading_platform"
+DATABASE_URL = os.environ.get(
+    "DATABASE_URL",
+    "postgresql://nikitasokovyh@localhost:5432/trading_platform",
+)
 
 engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(bind=engine)

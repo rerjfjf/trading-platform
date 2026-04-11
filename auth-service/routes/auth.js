@@ -1,14 +1,45 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const rateLimit = require('express-rate-limit');
 const { Pool } = require('pg');
 const { verifyToken, PLAN_LIMITS } = require('../middleware/jwt');
 
 const router = express.Router();
 const pool = new Pool({ connectionString: process.env.DB_URL });
 
+const isProd = process.env.NODE_ENV === 'production';
+
+const loginRegisterLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: isProd ? 40 : 400,
+  message: { error: 'Too many attempts, try again later' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+async function maybeBootstrapAdmin() {
+  if (process.env.CREATE_DEFAULT_ADMIN !== 'true') return;
+  const password = process.env.DEFAULT_ADMIN_PASSWORD;
+  if (!password || password.length < 12) {
+    console.warn(
+      'CREATE_DEFAULT_ADMIN=true but DEFAULT_ADMIN_PASSWORD missing or shorter than 12 chars — skipping admin bootstrap.'
+    );
+    return;
+  }
+  const existing = await pool.query(`SELECT id FROM users WHERE username = $1`, ['admin']);
+  if (existing.rows.length > 0) return;
+  const hash = await bcrypt.hash(password, 12);
+  await pool.query(
+    `INSERT INTO users (username, email, password_hash, plan, is_admin) VALUES ($1, $2, $3, $4, $5)`,
+    ['admin', 'admin@trading.com', hash, 'premium', true]
+  );
+  console.log('Bootstrap: user "admin" created. Change the password after first login.');
+}
+
 // Создаём таблицу если нет
-pool.query(`
+pool
+  .query(`
   CREATE TABLE IF NOT EXISTS users (
     id SERIAL PRIMARY KEY,
     username VARCHAR(50) UNIQUE NOT NULL,
@@ -20,25 +51,24 @@ pool.query(`
     last_request_date DATE DEFAULT CURRENT_DATE,
     created_at TIMESTAMP DEFAULT NOW()
   )
-`).then(() => {
-  // Создаём админа если нет
-  return pool.query(`SELECT * FROM users WHERE username = 'admin'`);
-}).then(async (result) => {
-  if (result.rows.length === 0) {
-    const hash = await bcrypt.hash('admin123', 10);
-    await pool.query(
-      `INSERT INTO users (username, email, password_hash, plan, is_admin) VALUES ($1, $2, $3, $4, $5)`,
-      ['admin', 'admin@trading.com', hash, 'premium', true]
-    );
-    console.log('Admin created: admin / admin123 ✅');
-  }
-}).catch(console.error);
+`)
+  .then(() => maybeBootstrapAdmin())
+  .catch(console.error);
 
 // Регистрация
-router.post('/register', async (req, res) => {
+router.post('/register', loginRegisterLimiter, async (req, res) => {
   const { username, email, password } = req.body;
   if (!username || !email || !password) {
     return res.status(400).json({ error: 'All fields required' });
+  }
+  if (typeof password !== 'string' || password.length < 8) {
+    return res.status(400).json({ error: 'Password must be at least 8 characters' });
+  }
+  if (password.length > 128) {
+    return res.status(400).json({ error: 'Password too long' });
+  }
+  if (typeof username !== 'string' || username.length < 2 || username.length > 50) {
+    return res.status(400).json({ error: 'Invalid username' });
   }
   try {
     const hash = await bcrypt.hash(password, 10);
@@ -60,7 +90,7 @@ router.post('/register', async (req, res) => {
 });
 
 // Логин
-router.post('/login', async (req, res) => {
+router.post('/login', loginRegisterLimiter, async (req, res) => {
   const { username, password } = req.body;
   try {
     const result = await pool.query(`SELECT * FROM users WHERE username = $1`, [username]);

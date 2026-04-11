@@ -1,0 +1,26 @@
+# Локальная PostgreSQL для API (trading_platform) и auth-service (trading_auth).
+# Запуск: docker compose up -d
+# Подключение с хоста: localhost:5432
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: trading-platform-db
+    restart: unless-stopped
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-trading}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-trading_dev_change_me}
+      POSTGRES_DB: ${POSTGRES_DB:-trading_platform}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/postgres/docker-entrypoint-initdb.d:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:

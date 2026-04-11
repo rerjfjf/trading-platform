@@ -1,13 +1,33 @@
 import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-import urllib.request
+import hashlib
 import json as json_lib
-from fastapi import FastAPI, Header, HTTPException
+import logging
+import urllib.error
+import urllib.request
+
+import httpx
 from dotenv import load_dotenv
+from fastapi import Body, FastAPI, Header, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.util import get_remote_address
+from starlette.requests import Request
+from typing import List
+
 load_dotenv()
 
-AUTH_SERVICE = "http://localhost:3001/auth"
+AI_CHAT_RATE_LIMIT = os.environ.get("AI_CHAT_RATE_LIMIT", "30/minute")
+
+logger = logging.getLogger(__name__)
+
+AUTH_SERVICE_BASE = os.environ.get(
+    "AUTH_SERVICE_URL", "http://localhost:3001/auth"
+).rstrip("/")
+
 
 def get_current_user(authorization: str = None):
     if not authorization:
@@ -16,17 +36,18 @@ def get_current_user(authorization: str = None):
         token = authorization.replace("Bearer ", "")
         data = json_lib.dumps({"token": token}).encode()
         req = urllib.request.Request(
-            f"{AUTH_SERVICE}/verify",
+            f"{AUTH_SERVICE_BASE}/verify",
             data=data,
             headers={"Content-Type": "application/json"},
-            method="POST"
+            method="POST",
         )
-        with urllib.request.urlopen(req) as response:
+        with urllib.request.urlopen(req, timeout=10) as response:
             result = json_lib.loads(response.read())
             if result.get("valid"):
                 return result
         return None
-    except:
+    except (urllib.error.URLError, urllib.error.HTTPError, json_lib.JSONDecodeError, TimeoutError, ValueError) as e:
+        logger.debug("Auth verify failed: %s", e)
         return None
 
 def check_plan(user_data: dict, feature: str) -> bool:
@@ -38,10 +59,6 @@ def check_plan(user_data: dict, feature: str) -> bool:
     return "all" in features or feature in features
 
 from database.crud import save_backtest, get_backtest_history, save_portfolio, add_to_watchlist, get_watchlist
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
-from typing import List
 
 from data.loader import load_stock_data
 from strategies.ma_crossover import ma_crossover_strategy
@@ -55,13 +72,31 @@ from models.portfolio import optimize_portfolio
 
 app = FastAPI(title="Trading Platform API", version="1.0.0")
 
-# Разрешаем запросы с фронтенда
+_origins_env = os.environ.get("ALLOWED_ORIGINS", "*").strip()
+if _origins_env == "*":
+    _cors_origins = ["*"]
+else:
+    _cors_origins = [o.strip() for o in _origins_env.split(",") if o.strip()]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=_cors_origins,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+def _ai_chat_rate_key(request: Request) -> str:
+    """Лимит по пользователю (хэш токена), иначе по IP."""
+    auth = request.headers.get("Authorization") or ""
+    if auth.startswith("Bearer ") and len(auth) > 14:
+        return hashlib.sha256(auth.encode()).hexdigest()
+    return get_remote_address(request)
+
+
+limiter = Limiter(key_func=get_remote_address)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # --- Модели запросов ---
 
@@ -470,40 +505,77 @@ def load_portfolio(authorization: str = Header(None)):
 
 
 @app.post("/ai/chat")
-def ai_chat(req: dict, authorization: str = Header(None)):
+@limiter.limit(AI_CHAT_RATE_LIMIT, key_func=_ai_chat_rate_key)
+def ai_chat(
+    request: Request,
+    authorization: str = Header(None),
+    req: dict = Body(...),
+):
     user_data = get_current_user(authorization)
     if not user_data:
         raise HTTPException(status_code=401, detail="Требуется авторизация")
-    
-    import httpx
+
+    groq_key = os.environ.get("GROQ_KEY", "").strip()
+    if not groq_key:
+        raise HTTPException(
+            status_code=503,
+            detail="AI чат не настроен на сервере (нет GROQ_KEY)",
+        )
+
     messages = req.get("messages", [])
-    
-    with httpx.Client() as client:
-        response = client.post(
-            "https://api.groq.com/openai/v1/chat/completions",
-            headers={
-                "Authorization": f"Bearer {os.environ.get('GROQ_KEY', '')}",
-                "Content-Type": "application/json"
-            },
-            json={
-                "model": "llama-3.3-70b-versatile",
-                "max_tokens": 1000,
-                "messages": [
-                    {
-                        "role": "system",
-                        "content": """Ты AI ассистент торговой платформы TRADE_SYS.
+    if not isinstance(messages, list):
+        raise HTTPException(status_code=400, detail="messages должен быть массивом")
+
+    try:
+        with httpx.Client() as client:
+            response = client.post(
+                "https://api.groq.com/openai/v1/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {groq_key}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "model": "llama-3.3-70b-versatile",
+                    "max_tokens": 1000,
+                    "messages": [
+                        {
+                            "role": "system",
+                            "content": """Ты AI ассистент торговой платформы TRADE_SYS.
 Помогаешь трейдерам и инвесторам анализировать акции.
 Отвечай кратко и по делу. Платформа умеет: бэктестинг (RSI, MA, MACD, Bollinger),
 Monte Carlo, LSTM нейросеть, Блэк-Шоулз, Марковиц, VaR, stress testing.
-Отвечай на том языке на котором тебя спрашивают."""
-                    },
-                    *messages
-                ]
-            },
-            timeout=30.0
-        )
-        result = response.json()
-        return {"content": result["choices"][0]["message"]["content"]}
+Отвечай на том языке на котором тебя спрашивают.""",
+                        },
+                        *messages,
+                    ],
+                },
+                timeout=30.0,
+            )
+            try:
+                result = response.json()
+            except json_lib.JSONDecodeError:
+                logger.warning("Groq returned non-JSON response")
+                raise HTTPException(
+                    status_code=502,
+                    detail="Ошибка провайдера AI",
+                )
+            if response.status_code >= 400:
+                err = result.get("error", {}).get("message", response.text)
+                logger.warning("Groq API error: %s", err)
+                raise HTTPException(
+                    status_code=502,
+                    detail="Ошибка провайдера AI",
+                )
+            choices = result.get("choices") or []
+            if not choices or not choices[0].get("message", {}).get("content"):
+                raise HTTPException(
+                    status_code=502,
+                    detail="Пустой ответ от AI",
+                )
+            return {"content": choices[0]["message"]["content"]}
+    except httpx.RequestError as e:
+        logger.warning("Groq request failed: %s", e)
+        raise HTTPException(status_code=502, detail="Не удалось связаться с AI-сервисом")
     
 
 
